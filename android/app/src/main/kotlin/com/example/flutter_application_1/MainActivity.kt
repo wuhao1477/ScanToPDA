@@ -1,4 +1,4 @@
-package com.example.flutter_application_1
+package com.example.scan_to_pda
 
 import android.content.Intent
 import android.os.Build
@@ -76,6 +76,22 @@ class MainActivity : FlutterActivity() {
                 "hasBluetoothPermissions" -> {
                     val hasPermissions = hasBluetoothPermissions()
                     result.success(hasPermissions)
+                }
+                "isAccessibilityServiceEnabled" -> {
+                    val isEnabled = isAccessibilityServiceEnabled()
+                    result.success(isEnabled)
+                }
+                "getScannedBarcodes" -> {
+                    val barcodes = getScannedBarcodes()
+                    result.success(barcodes)
+                }
+                "requestAccessibilityPermission" -> {
+                    requestAccessibilityPermission()
+                    result.success(true)
+                }
+                "clearBarcodes" -> {
+                    clearBarcodes()
+                    result.success(true)
                 }
                 else -> result.notImplemented()
             }
@@ -327,6 +343,52 @@ class MainActivity : FlutterActivity() {
             mapOf<String, Any>(
                 "error" to "Failed to get compatibility info: ${e.message}"
             )
+        }
+    }
+    
+    // 获取扫描的条码
+    private fun getScannedBarcodes(): List<Map<String, Any>> {
+        // 这里应该从某个存储中获取扫描的条码
+        // 暂时返回空列表，实际实现需要根据具体需求
+        return emptyList()
+    }
+    
+    // 请求无障碍权限
+    private fun requestAccessibilityPermission() {
+        try {
+            val intent = Intent(android.provider.Settings.ACTION_ACCESSIBILITY_SETTINGS)
+            intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK
+            startActivity(intent)
+            Log.d(TAG, "打开无障碍设置页面")
+        } catch (e: Exception) {
+            Log.e(TAG, "打开无障碍设置失败: ${e.message}")
+        }
+    }
+    
+    // 清除条码
+    private fun clearBarcodes() {
+        // 这里应该清除存储的条码
+        // 暂时为空实现，实际需要根据具体需求实现
+        Log.d(TAG, "清除条码数据")
+    }
+    
+    // 检查无障碍服务是否启用
+    private fun isAccessibilityServiceEnabled(): Boolean {
+        return try {
+            val accessibilityManager = getSystemService(Context.ACCESSIBILITY_SERVICE) as android.view.accessibility.AccessibilityManager
+            val enabledServices = android.provider.Settings.Secure.getString(
+                contentResolver,
+                android.provider.Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES
+            ) ?: ""
+            
+            val serviceName = "$packageName/${KeyboardAccessibilityService::class.java.name}"
+            val isEnabled = enabledServices.contains(serviceName)
+            
+            Log.d(TAG, "无障碍服务检查: $serviceName, 状态: $isEnabled")
+            isEnabled
+        } catch (e: Exception) {
+            Log.e(TAG, "检查无障碍服务状态失败: ${e.message}")
+            false
         }
     }
     

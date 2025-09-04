@@ -1,4 +1,4 @@
-package com.example.flutter_application_1
+package com.example.scan_to_pda
 
 import java.util.Date
 
