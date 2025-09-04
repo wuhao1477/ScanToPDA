@@ -539,38 +539,41 @@ class _BluetoothScannerPageState extends State<BluetoothScannerPage> with Widget
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('蓝牙扫码枪监听'),
-        actions: [
-          if (_isPlatformSupported)
-            IconButton(
-              icon: const Icon(Icons.refresh),
-              onPressed: _getScannedBarcodes,
-              tooltip: '刷新扫描记录',
-            ),
-          if (_isPlatformSupported)
-            IconButton(
-              icon: const Icon(Icons.delete),
-              onPressed: _clearBarcodes,
-              tooltip: '清空扫描记录',
-            ),
-        ],
-      ),
-      body: _isPlatformSupported 
-        ? Column(
+    return Column(
+      children: [
+        // 主内容区域
+        Expanded(
+          child: _isPlatformSupported
+            ? Column(
             children: [
               // 说明文本
-              Padding(
-                padding: const EdgeInsets.all(8.0),
-                child: Text(
-                  '请使用下方控制面板手动启动服务并授予必要权限，启动后才能监听蓝牙扫码枪输入',
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: Colors.grey[700],
-                    fontStyle: FontStyle.italic,
-                  ),
-                  textAlign: TextAlign.center,
+              Container(
+                margin: const EdgeInsets.all(12.0),
+                padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
+                decoration: BoxDecoration(
+                  color: Colors.blue.withOpacity(0.05),
+                  borderRadius: BorderRadius.circular(8.0),
+                  border: Border.all(color: Colors.blue.withOpacity(0.2), width: 1),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.info_outline,
+                      color: Colors.blue[600],
+                      size: 20,
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        '请使用下方控制面板手动启动服务并授予必要权限，启动后才能监听蓝牙扫码枪输入',
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: Colors.grey[700],
+                          height: 1.4,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
               
@@ -624,22 +627,64 @@ class _BluetoothScannerPageState extends State<BluetoothScannerPage> with Widget
                     _lastError,
                     style: const TextStyle(color: Colors.red, fontSize: 12),
                   ),
-                ),
-            
+                              ),
+              
+              // 分割线
+              Container(
+                margin: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+                height: 1,
+                color: Colors.grey.withOpacity(0.3),
+              ),
+              
               // 扫描记录标题
-              Padding(
-                padding: const EdgeInsets.all(8.0),
+              Container(
+                margin: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
+                padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8.0),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.surfaceContainerHighest.withOpacity(0.5),
+                  borderRadius: BorderRadius.circular(8.0),
+                ),
                 child: Row(
                   children: [
-                    const Icon(Icons.list_alt, size: 18),
+                    Icon(
+                      Icons.list_alt, 
+                      size: 20,
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
                     const SizedBox(width: 8),
-                    Text(
-                      '扫码记录 (${_scannedCodes.length})',
-                      style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16,
+                    Expanded(
+                      child: Text(
+                        '扫码记录 (${_scannedCodes.length})',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                          color: Theme.of(context).colorScheme.onSurface,
+                        ),
                       ),
                     ),
+                    // {{ AURA-X: Add - 将刷新和清理按钮集成到标题行右侧. Approval: 寸止(ID:1735728401). }}
+                    if (_isPlatformSupported) ...[
+                      IconButton(
+                        icon: const Icon(Icons.refresh, size: 20),
+                        onPressed: _getScannedBarcodes,
+                        tooltip: '刷新扫描记录',
+                        padding: const EdgeInsets.all(4),
+                        constraints: const BoxConstraints(
+                          minWidth: 32,
+                          minHeight: 32,
+                        ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.delete, size: 20),
+                        onPressed: _clearBarcodes,
+                        tooltip: '清空扫描记录',
+                        padding: const EdgeInsets.all(4),
+                        constraints: const BoxConstraints(
+                          minWidth: 32,
+                          minHeight: 32,
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -650,10 +695,37 @@ class _BluetoothScannerPageState extends State<BluetoothScannerPage> with Widget
                     ? Center(
                         child: Column(
                           mainAxisSize: MainAxisSize.min,
-                          children: const [
-                            Icon(Icons.qr_code_scanner, size: 48, color: Colors.grey),
-                            SizedBox(height: 16),
-                            Text('还没有扫描记录', style: TextStyle(color: Colors.grey)),
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(24),
+                              decoration: BoxDecoration(
+                                color: Colors.blue.withOpacity(0.1),
+                                shape: BoxShape.circle,
+                              ),
+                              child: Icon(
+                                Icons.qr_code_scanner, 
+                                size: 64, 
+                                color: Colors.blue.withOpacity(0.7),
+                              ),
+                            ),
+                            const SizedBox(height: 24),
+                            Text(
+                              '还没有扫描记录',
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.w500,
+                                color: Colors.grey[600],
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              '启动监听服务后，扫码记录将显示在这里',
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: Colors.grey[500],
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
                           ],
                         ),
                       )
@@ -664,7 +736,7 @@ class _BluetoothScannerPageState extends State<BluetoothScannerPage> with Widget
                           final barcodeData = _scannedCodes[index];
                           final time = barcodeData.timestamp;
                           final formattedTime = '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}:${time.second.toString().padLeft(2, '0')}';
-                          
+
                           return Card(
                             margin: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
                             child: ListTile(
@@ -688,37 +760,41 @@ class _BluetoothScannerPageState extends State<BluetoothScannerPage> with Widget
               ),
             ],
           )
-        : Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: const [
-                Icon(
-                  Icons.android_outlined,
-                  size: 64,
-                  color: Colors.grey,
-                ),
-                SizedBox(height: 16),
-                Text(
-                  '此功能需要Android设备上的无障碍服务支持',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
+        : Expanded(
+            child: Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: const [
+                  Icon(
+                    Icons.android_outlined,
+                    size: 64,
                     color: Colors.grey,
                   ),
-                ),
-                SizedBox(height: 16),
-                Text(
-                  '请在Android设备上运行此应用以使用完整功能',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: Colors.grey,
+                  SizedBox(height: 16),
+                  Text(
+                    '此功能需要Android设备上的无障碍服务支持',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.grey,
+                    ),
                   ),
-                ),
-              ],
+                  SizedBox(height: 16),
+                  Text(
+                    '请在Android设备上运行此应用以使用完整功能',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: Colors.grey,
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
+        ),  // {{ AURA-X: Add - 关闭最外层Expanded组件的右括号. Approval: 寸止(ID:1735728400). }}
+      ],
     );
   }
 } 

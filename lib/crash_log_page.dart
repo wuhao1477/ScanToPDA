@@ -125,6 +125,9 @@ class _CrashLogPageState extends State<CrashLogPage> {
   static const MethodChannel _crashLogChannel = MethodChannel('com.example.scan_to_pda/crash_log');
 
   List<CrashLogData> _crashLogs = [];
+  List<CrashLogData>? _filteredLogsCache;
+  String _lastSearchQuery = '';
+  String _lastSelectedFilter = 'all';
   bool _isLoading = false;
   String _searchQuery = '';
   String _selectedFilter = 'all';
@@ -152,6 +155,8 @@ class _CrashLogPageState extends State<CrashLogPage> {
       if (result != null) {
         setState(() {
           _crashLogs = result.map((item) => CrashLogData.fromMap(Map<String, dynamic>.from(item))).toList();
+          // 清除缓存，强制重新计算过滤结果
+          _filteredLogsCache = null;
         });
       }
     } on PlatformException catch (e) {
@@ -282,8 +287,15 @@ class _CrashLogPageState extends State<CrashLogPage> {
     }
   }
 
-  /// 过滤日志
+  /// 过滤日志（带缓存优化）
   List<CrashLogData> get _filteredCrashLogs {
+    // 检查是否需要重新计算
+    if (_filteredLogsCache != null && 
+        _lastSearchQuery == _searchQuery && 
+        _lastSelectedFilter == _selectedFilter) {
+      return _filteredLogsCache!;
+    }
+
     List<CrashLogData> filtered = _crashLogs;
 
     // 按类型过滤
@@ -303,6 +315,11 @@ class _CrashLogPageState extends State<CrashLogPage> {
             log.deviceModel.toLowerCase().contains(_searchQuery.toLowerCase());
       }).toList();
     }
+
+    // 缓存结果
+    _filteredLogsCache = filtered;
+    _lastSearchQuery = _searchQuery;
+    _lastSelectedFilter = _selectedFilter;
 
     return filtered;
   }
@@ -369,10 +386,24 @@ class _CrashLogPageState extends State<CrashLogPage> {
               children: [
                 // 搜索框
                 TextField(
-                  decoration: const InputDecoration(
+                  decoration: InputDecoration(
                     hintText: '搜索错误信息、类型或设备型号...',
-                    prefixIcon: Icon(Icons.search),
-                    border: OutlineInputBorder(),
+                    prefixIcon: const Icon(Icons.search),
+                    suffixIcon: _searchQuery.isNotEmpty
+                        ? IconButton(
+                            icon: const Icon(Icons.clear),
+                            onPressed: () {
+                              setState(() {
+                                _searchQuery = '';
+                              });
+                            },
+                          )
+                        : null,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    filled: true,
+                    fillColor: Theme.of(context).colorScheme.surface,
                     isDense: true,
                   ),
                   onChanged: (value) {
@@ -474,15 +505,35 @@ class _CrashLogPageState extends State<CrashLogPage> {
   Widget _buildCrashLogItem(CrashLogData crashLog) {
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      elevation: crashLog.isRead ? 1 : 3,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(
+          color: crashLog.isRead 
+              ? Colors.transparent 
+              : crashLog.typeColor.withOpacity(0.3),
+          width: crashLog.isRead ? 0 : 1,
+        ),
+      ),
       child: ListTile(
+        contentPadding: const EdgeInsets.all(16),
         leading: Stack(
           children: [
-            CircleAvatar(
-              backgroundColor: crashLog.typeColor.withOpacity(0.1),
+            Container(
+              width: 48,
+              height: 48,
+              decoration: BoxDecoration(
+                color: crashLog.typeColor.withOpacity(0.1),
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: crashLog.typeColor.withOpacity(0.3),
+                  width: 2,
+                ),
+              ),
               child: Icon(
                 crashLog.typeIcon,
                 color: crashLog.typeColor,
-                size: 20,
+                size: 24,
               ),
             ),
             if (!crashLog.isRead)
@@ -490,11 +541,12 @@ class _CrashLogPageState extends State<CrashLogPage> {
                 right: 0,
                 top: 0,
                 child: Container(
-                  width: 8,
-                  height: 8,
-                  decoration: const BoxDecoration(
+                  width: 12,
+                  height: 12,
+                  decoration: BoxDecoration(
                     color: Colors.red,
                     shape: BoxShape.circle,
+                    border: Border.all(color: Colors.white, width: 2),
                   ),
                 ),
               ),
@@ -621,16 +673,21 @@ class _CrashLogPageState extends State<CrashLogPage> {
 }
 
 /// 崩溃日志详情页面
-class CrashLogDetailPage extends StatelessWidget {
+class CrashLogDetailPage extends StatefulWidget {
   final CrashLogData crashLog;
 
   const CrashLogDetailPage({Key? key, required this.crashLog}) : super(key: key);
 
   @override
+  State<CrashLogDetailPage> createState() => _CrashLogDetailPageState();
+}
+
+class _CrashLogDetailPageState extends State<CrashLogDetailPage> {
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(crashLog.typeDisplayName),
+        title: Text(widget.crashLog.typeDisplayName),
         actions: [
           IconButton(
             icon: const Icon(Icons.share),
@@ -654,11 +711,11 @@ class CrashLogDetailPage extends StatelessWidget {
               title: '基本信息',
               icon: Icons.info,
               children: [
-                _buildInfoRow('错误类型', crashLog.typeDisplayName),
-                _buildInfoRow('发生时间', crashLog.formattedTime),
-                _buildInfoRow('设备型号', crashLog.deviceModel),
-                _buildInfoRow('Android版本', crashLog.androidVersion),
-                _buildInfoRow('应用版本', crashLog.appVersion),
+                _buildInfoRow('错误类型', widget.crashLog.typeDisplayName),
+                _buildInfoRow('发生时间', widget.crashLog.formattedTime),
+                _buildInfoRow('设备型号', widget.crashLog.deviceModel),
+                _buildInfoRow('Android版本', widget.crashLog.androidVersion),
+                _buildInfoRow('应用版本', widget.crashLog.appVersion),
               ],
             ),
 
@@ -669,11 +726,11 @@ class CrashLogDetailPage extends StatelessWidget {
               title: '内存信息',
               icon: Icons.memory,
               children: [
-                _buildInfoRow('可用内存', '${(crashLog.availableMemory / 1024 / 1024).toStringAsFixed(1)} MB'),
-                _buildInfoRow('总内存', '${(crashLog.totalMemory / 1024 / 1024).toStringAsFixed(1)} MB'),
-                _buildInfoRow('内存使用率', 
-                  crashLog.totalMemory > 0 
-                    ? '${((crashLog.totalMemory - crashLog.availableMemory) / crashLog.totalMemory * 100).toStringAsFixed(1)}%'
+                _buildInfoRow('可用内存', '${(widget.crashLog.availableMemory / 1024 / 1024).toStringAsFixed(1)} MB'),
+                _buildInfoRow('总内存', '${(widget.crashLog.totalMemory / 1024 / 1024).toStringAsFixed(1)} MB'),
+                _buildInfoRow('内存使用率',
+                  widget.crashLog.totalMemory > 0
+                    ? '${((widget.crashLog.totalMemory - widget.crashLog.availableMemory) / widget.crashLog.totalMemory * 100).toStringAsFixed(1)}%'
                     : '未知'),
               ],
             ),
@@ -694,7 +751,7 @@ class CrashLogDetailPage extends StatelessWidget {
                     border: Border.all(color: Colors.red.withOpacity(0.3)),
                   ),
                   child: Text(
-                    crashLog.errorMessage.isNotEmpty ? crashLog.errorMessage : '无错误信息',
+                    widget.crashLog.errorMessage.isNotEmpty ? widget.crashLog.errorMessage : '无错误信息',
                     style: const TextStyle(
                       fontFamily: 'monospace',
                       fontSize: 13,
@@ -722,7 +779,7 @@ class CrashLogDetailPage extends StatelessWidget {
                   ),
                   child: SingleChildScrollView(
                     child: Text(
-                      crashLog.stackTrace.isNotEmpty ? crashLog.stackTrace : '无堆栈信息',
+                      widget.crashLog.stackTrace.isNotEmpty ? widget.crashLog.stackTrace : '无堆栈信息',
                       style: const TextStyle(
                         fontFamily: 'monospace',
                         fontSize: 12,
@@ -751,7 +808,7 @@ class CrashLogDetailPage extends StatelessWidget {
                   ),
                   child: SingleChildScrollView(
                     child: Text(
-                      crashLog.deviceInfo.isNotEmpty ? crashLog.deviceInfo : '无设备信息',
+                      widget.crashLog.deviceInfo.isNotEmpty ? widget.crashLog.deviceInfo : '无设备信息',
                       style: const TextStyle(
                         fontFamily: 'monospace',
                         fontSize: 12,
@@ -773,25 +830,41 @@ class CrashLogDetailPage extends StatelessWidget {
     required List<Widget> children,
   }) {
     return Card(
+      elevation: 2,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.all(Radius.circular(12)),
+      ),
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
               children: [
-                Icon(icon, size: 20),
-                const SizedBox(width: 8),
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.primary.withOpacity(0.1),
+                    borderRadius: const BorderRadius.all(Radius.circular(8)),
+                  ),
+                  child: Icon(
+                    icon,
+                    size: 24,
+                    color: Theme.of(context).colorScheme.primary,
+                  ),
+                ),
+                const SizedBox(width: 12),
                 Text(
                   title,
-                  style: const TextStyle(
-                    fontSize: 18,
+                  style: TextStyle(
+                    fontSize: 20,
                     fontWeight: FontWeight.bold,
+                    color: Theme.of(context).colorScheme.onSurface,
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 16),
             ...children,
           ],
         ),
@@ -801,24 +874,40 @@ class CrashLogDetailPage extends StatelessWidget {
 
   Widget _buildInfoRow(String label, String value) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
+      padding: const EdgeInsets.symmetric(vertical: 8),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          SizedBox(
-            width: 80,
+          Container(
+            constraints: const BoxConstraints(minWidth: 90),
             child: Text(
               '$label:',
-              style: const TextStyle(
-                fontWeight: FontWeight.w500,
-                color: Colors.grey,
+              style: TextStyle(
+                fontWeight: FontWeight.w600,
+                color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
+                fontSize: 14,
               ),
             ),
           ),
+          const SizedBox(width: 12),
           Expanded(
-            child: Text(
-              value,
-              style: const TextStyle(fontFamily: 'monospace'),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.surface,
+                borderRadius: const BorderRadius.all(Radius.circular(8)),
+                border: Border.all(
+                  color: Theme.of(context).colorScheme.outline.withOpacity(0.2),
+                ),
+              ),
+              child: Text(
+                value,
+                style: TextStyle(
+                  fontFamily: 'monospace',
+                  fontSize: 13,
+                  color: Theme.of(context).colorScheme.onSurface,
+                ),
+              ),
             ),
           ),
         ],
@@ -829,32 +918,32 @@ class CrashLogDetailPage extends StatelessWidget {
   void _shareLog(BuildContext context) {
     final String logText = '''
 === 崩溃日志详情 ===
-时间: ${crashLog.formattedTime}
-类型: ${crashLog.typeDisplayName}
-设备: ${crashLog.deviceModel}
-Android: ${crashLog.androidVersion}
-应用版本: ${crashLog.appVersion}
+时间: ${widget.crashLog.formattedTime}
+类型: ${widget.crashLog.typeDisplayName}
+设备: ${widget.crashLog.deviceModel}
+Android: ${widget.crashLog.androidVersion}
+应用版本: ${widget.crashLog.appVersion}
 
 错误信息:
-${crashLog.errorMessage}
+${widget.crashLog.errorMessage}
 
 堆栈跟踪:
-${crashLog.stackTrace}
+${widget.crashLog.stackTrace}
 
 设备信息:
-${crashLog.deviceInfo}
+${widget.crashLog.deviceInfo}
 ''';
 
-    Share.share(logText, subject: '崩溃日志 - ${crashLog.typeDisplayName}');
+    Share.share(logText, subject: '崩溃日志 - ${widget.crashLog.typeDisplayName}');
   }
 
   void _copyToClipboard(BuildContext context) {
     final String logText = '''
-时间: ${crashLog.formattedTime}
-类型: ${crashLog.typeDisplayName}
-错误: ${crashLog.errorMessage}
+时间: ${widget.crashLog.formattedTime}
+类型: ${widget.crashLog.typeDisplayName}
+错误: ${widget.crashLog.errorMessage}
 
-${crashLog.stackTrace}
+${widget.crashLog.stackTrace}
 ''';
 
     Clipboard.setData(ClipboardData(text: logText));
