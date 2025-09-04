@@ -64,9 +64,21 @@ jobs:
         shell: bash
         run: |
           set -euxo pipefail
-          ACTION_TYPE="${{ github.event.inputs.action_type || 'url' }}"
-          TARGET="${{ github.event.inputs.target || 'https://www.baidu.com' }}"
-          ./build_with_easter_egg.sh "$ACTION_TYPE" "$TARGET"
+          ACTION_TYPE="${{ github.event.inputs.action_type }}"
+          TARGET="${{ github.event.inputs.target }}"
+
+          # 如果操作类型为 'none'，则构建标准 APK（无彩蛋配置）
+          if [ "$ACTION_TYPE" = "none" ]; then
+            echo "📱 构建标准 APK（无彩蛋配置）..."
+            flutter clean
+            flutter pub get
+            flutter build apk
+            echo "✅ 标准 APK 构建完成！"
+            echo "APK 位置: build/app/outputs/flutter-apk/app-release.apk"
+          else
+            # 使用彩蛋配置构建
+            ./build_with_easter_egg.sh "$ACTION_TYPE" "$TARGET"
+          fi
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
