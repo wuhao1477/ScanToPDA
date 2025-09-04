@@ -8,7 +8,7 @@ class PermissionGuidePage extends StatefulWidget {
   State<PermissionGuidePage> createState() => _PermissionGuidePageState();
 }
 
-class _PermissionGuidePageState extends State<PermissionGuidePage> {
+class _PermissionGuidePageState extends State<PermissionGuidePage> with WidgetsBindingObserver {
   static const platform = MethodChannel('com.example.scan_to_pda/barcode_scanner');
   
   // 权限状态
@@ -28,7 +28,27 @@ class _PermissionGuidePageState extends State<PermissionGuidePage> {
   @override
   void initState() {
     super.initState();
+    // 添加生命周期观察者
+    WidgetsBinding.instance.addObserver(this);
     _checkAllPermissions();
+  }
+
+  @override
+  void dispose() {
+    // 移除生命周期观察者
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+    
+    // 当应用从后台恢复到前台时，自动刷新权限状态
+    if (state == AppLifecycleState.resumed) {
+      print('权限向导页面：应用恢复前台，刷新权限状态');
+      _checkAllPermissions();
+    }
   }
 
   // 检查所有权限状态

@@ -1,9 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'easter_egg_settings_page.dart';
 
-class AboutPage extends StatelessWidget {
+class AboutPage extends StatefulWidget {
   const AboutPage({Key? key}) : super(key: key);
+
+  @override
+  State<AboutPage> createState() => _AboutPageState();
+}
+
+class _AboutPageState extends State<AboutPage> {
+  int _developerClickCount = 0; // 开发者名称点击计数
 
   @override
   Widget build(BuildContext context) {
@@ -398,7 +406,7 @@ class AboutPage extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _buildInfoRow('开发者', 'wuhao1477'),
+            _buildDeveloperInfoRow('开发者', 'wuhao1477'),
             const SizedBox(height: 8),
             _buildInfoRow('项目地址', 'github.com/wuhao1477/ScanToPDA'),
             const SizedBox(height: 16),
@@ -415,6 +423,108 @@ class AboutPage extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  // 开发者信息行，支持点击彩蛋
+  Widget _buildDeveloperInfoRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 100,
+            child: Text(
+              '$label:',
+              style: TextStyle(
+                fontWeight: FontWeight.w500,
+                color: Colors.grey[700],
+              ),
+            ),
+          ),
+          Expanded(
+            child: GestureDetector(
+              onTap: _onDeveloperNameTap,
+              child: Text(
+                value,
+                style: const TextStyle(
+                  fontFamily: 'monospace',
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // 开发者名称点击处理
+  void _onDeveloperNameTap() {
+    setState(() {
+      _developerClickCount++;
+    });
+
+    // 显示点击次数提示（从第7次开始显示）
+    if (_developerClickCount >= 7 && _developerClickCount <= 9) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('再点击 ${10 - _developerClickCount} 次解锁隐藏功能'),
+          duration: const Duration(seconds: 1),
+          behavior: SnackBarBehavior.floating,
+          backgroundColor: _developerClickCount >= 8 ? Colors.orange : null,
+        ),
+      );
+    } else if (_developerClickCount == 10) {
+      // 达到10次点击，进入彩蛋设置页面
+      _showEasterEggUnlocked();
+    }
+  }
+
+  // 显示彩蛋解锁提示并跳转
+  void _showEasterEggUnlocked() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Row(
+            children: [
+              Icon(Icons.egg, color: Colors.orange),
+              SizedBox(width: 8),
+              Text('🎉 彩蛋解锁！'),
+            ],
+          ),
+          content: const Text(
+            '恭喜你发现了隐藏功能！\n\n这里可以配置扫码后的特殊操作，比如自动打开指定应用或网址。',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('下次再说'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+                _navigateToEasterEggSettings();
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.orange,
+                foregroundColor: Colors.white,
+              ),
+              child: const Text('进入设置'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  // 跳转到彩蛋设置页面
+  void _navigateToEasterEggSettings() {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => const EasterEggSettingsPage(),
       ),
     );
   }

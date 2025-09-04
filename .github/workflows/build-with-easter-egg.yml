@@ -1,0 +1,131 @@
+name: Build APK with Easter Egg Configuration
+
+# 只允许手动触发，不会自动运行
+on:
+  workflow_dispatch:
+    inputs:
+      action_type:
+        description: '🎯 后置操作类型'
+        required: true
+        default: 'none'
+        type: choice
+        options:
+          - none
+          - app
+          - url
+      target_package:
+        description: '📱 应用包名 (当选择app时填写，例如: com.tencent.mm)'
+        required: false
+        type: string
+        default: ''
+      target_url:
+        description: '🌐 目标网址 (当选择url时填写，例如: https://www.baidu.com)'
+        required: false
+        type: string
+        default: ''
+      app_name:
+        description: '🏷️ 应用显示名称 (可选，例如: 微信)'
+        required: false
+        type: string
+        default: ''
+      build_type:
+        description: '🏗️ 构建类型'
+        required: true
+        default: 'apk'
+        type: choice
+        options:
+          - apk
+          - aab
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup Java
+      uses: actions/setup-java@v4
+      with:
+        distribution: 'zulu'
+        java-version: '17'
+        
+    - name: Setup Flutter
+      uses: subosito/flutter-action@v2
+      with:
+        flutter-version: '3.16.0'
+        
+    - name: Get dependencies
+      run: flutter pub get
+      
+    - name: Build App with Easter Egg Configuration
+      run: |
+        BUILD_ARGS=""
+        BUILD_TYPE="${{ github.event.inputs.build_type }}"
+        
+        # 构建彩蛋配置参数
+        if [ "${{ github.event.inputs.action_type }}" != "none" ]; then
+          BUILD_ARGS="--dart-define=EASTER_EGG_ACTION_TYPE=${{ github.event.inputs.action_type }}"
+          
+          if [ "${{ github.event.inputs.action_type }}" = "app" ] && [ -n "${{ github.event.inputs.target_package }}" ]; then
+            BUILD_ARGS="$BUILD_ARGS --dart-define=EASTER_EGG_TARGET_PACKAGE=${{ github.event.inputs.target_package }}"
+            
+            if [ -n "${{ github.event.inputs.app_name }}" ]; then
+              BUILD_ARGS="$BUILD_ARGS --dart-define=EASTER_EGG_SELECTED_APP_NAME=${{ github.event.inputs.app_name }}"
+            fi
+          elif [ "${{ github.event.inputs.action_type }}" = "url" ] && [ -n "${{ github.event.inputs.target_url }}" ]; then
+            BUILD_ARGS="$BUILD_ARGS --dart-define=EASTER_EGG_TARGET_URL=${{ github.event.inputs.target_url }}"
+          fi
+        fi
+        
+        echo "🏗️ 构建类型: $BUILD_TYPE"
+        echo "⚙️ 构建参数: $BUILD_ARGS"
+        
+        # 根据选择的类型执行构建
+        if [ "$BUILD_TYPE" = "aab" ]; then
+          echo "📦 构建 Android App Bundle (AAB)..."
+          flutter build appbundle $BUILD_ARGS
+        else
+          echo "📱 构建 Android APK..."
+          flutter build apk $BUILD_ARGS
+        fi
+        
+    - name: Upload Build Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: scantopda-${{ github.event.inputs.build_type }}-with-easter-egg
+        path: |
+          build/app/outputs/flutter-apk/app-release.apk
+          build/app/outputs/bundle/release/app-release.aab
+        
+    - name: Create Release Summary
+      run: |
+        echo "## 🎉 构建完成！" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### 📋 构建信息:" >> $GITHUB_STEP_SUMMARY
+        echo "- **构建类型:** ${{ github.event.inputs.build_type == 'aab' && 'Android App Bundle (AAB)' || 'Android APK' }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **构建时间:** $(date '+%Y-%m-%d %H:%M:%S UTC')" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### 🥚 彩蛋配置:" >> $GITHUB_STEP_SUMMARY
+        echo "- **操作类型:** ${{ github.event.inputs.action_type }}" >> $GITHUB_STEP_SUMMARY
+        
+        if [ "${{ github.event.inputs.action_type }}" = "app" ]; then
+          echo "- **目标应用:** ${{ github.event.inputs.app_name || '自定义应用' }} (\`${{ github.event.inputs.target_package }}\`)" >> $GITHUB_STEP_SUMMARY
+        elif [ "${{ github.event.inputs.action_type }}" = "url" ]; then
+          echo "- **目标网址:** ${{ github.event.inputs.target_url }}" >> $GITHUB_STEP_SUMMARY
+        fi
+        
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### 🔓 如何访问彩蛋功能:" >> $GITHUB_STEP_SUMMARY
+        echo "1. 📱 安装构建的应用文件" >> $GITHUB_STEP_SUMMARY
+        echo "2. ℹ️ 进入「关于应用」页面" >> $GITHUB_STEP_SUMMARY
+        echo "3. 👆 连续点击开发者名称 **10 次**" >> $GITHUB_STEP_SUMMARY
+        echo "4. ⚙️ 进入彩蛋设置页面配置或查看预设配置" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### 📂 文件位置:" >> $GITHUB_STEP_SUMMARY
+        if [ "${{ github.event.inputs.build_type }}" = "aab" ]; then
+          echo "- AAB 文件: \`build/app/outputs/bundle/release/app-release.aab\`" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "- APK 文件: \`build/app/outputs/flutter-apk/app-release.apk\`" >> $GITHUB_STEP_SUMMARY
+        fi
