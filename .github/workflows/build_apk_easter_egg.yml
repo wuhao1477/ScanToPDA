@@ -48,7 +48,7 @@ jobs:
         uses: subosito/flutter-action@v2
         with:
           channel: stable
-          flutter-version: "3.24.0"
+          flutter-version: "3.35.2"
           cache: true
 
       - name: Show env
@@ -59,6 +59,11 @@ jobs:
 
       - name: Make script executable
         run: chmod +x ./build_with_easter_egg.sh
+
+      - name: Clean Flutter cache
+        run: |
+          flutter clean
+          flutter pub cache clean
 
       - name: Build APK (non-interactive)
         shell: bash
