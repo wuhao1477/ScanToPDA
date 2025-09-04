@@ -134,6 +134,12 @@ class _CrashLogPageState extends State<CrashLogPage> {
     super.initState();
     _loadCrashLogs();
   }
+  
+  @override
+  void dispose() {
+    // 虽然当前没有需要释放的资源，但保持良好的编程习惯
+    super.dispose();
+  }
 
   /// 加载崩溃日志
   Future<void> _loadCrashLogs() async {

@@ -92,8 +92,8 @@ class KeyboardAccessibilityService : AccessibilityService() {
             intent.putExtra(FloatingWindowService.EXTRA_ACTION, FloatingWindowService.ACTION_UPDATE_UI)
             startService(intent)
             
-            // 不将instance设为null，保持引用
-            // 但标记服务状态为未启用
+            // 清理静态引用，避免内存泄漏
+            instance = null
             serviceEnabled = false
             
             // 尝试自动重启服务（系统可能会阻止这种行为）

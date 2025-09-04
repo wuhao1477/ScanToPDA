@@ -27,8 +27,10 @@ data class CrashLog(
         const val CRASH_TYPE_OOM = "OutOfMemory"
         const val CRASH_TYPE_FLUTTER = "FlutterError"
         
-        // 静态时间格式化器，避免重复创建
-        private val DATE_FORMATTER = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.getDefault())
+        // 线程安全的时间格式化器
+        private val DATE_FORMATTER = ThreadLocal.withInitial { 
+            java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.getDefault()) 
+        }
         
         /**
          * 从异常创建崩溃日志
@@ -56,7 +58,7 @@ data class CrashLog(
      */
     fun getFormattedTime(): String {
         val date = Date(timestamp)
-        return DATE_FORMATTER.format(date)
+        return DATE_FORMATTER.get().format(date)
     }
     
     /**

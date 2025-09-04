@@ -101,7 +101,10 @@ class BarcodeScannerService : Service() {
         // 停止心跳
         stopHeartbeatAlarm()
         
+        // 清理静态引用，避免内存泄漏
         instance = null
+        eventSink = null
+        
         super.onDestroy()
         
         // 尝试重启服务
