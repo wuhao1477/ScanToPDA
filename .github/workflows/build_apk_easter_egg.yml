@@ -1,0 +1,79 @@
+name: Build APK with Easter Egg Configuration
+
+on:
+  workflow_dispatch:
+    inputs:
+      action_type:
+        description: "Easter egg action type (app|url)"
+        required: true
+        default: "url"
+      target:
+        description: "Target package name (for app) or URL (for url)"
+        required: true
+        default: "https://www.baidu.com"
+  push:
+    tags:
+      - 'v*.*.*'
+
+jobs:
+  build-apk:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: zulu
+          java-version: "17"
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: "3.24.0"
+          cache: true
+
+      - name: Show env
+        run: |
+          flutter --version
+          dart --version || true
+          echo "GITHUB_REF: $GITHUB_REF"
+
+      - name: Make script executable
+        run: chmod +x ./build_with_easter_egg.sh
+
+      - name: Build APK (non-interactive)
+        shell: bash
+        run: |
+          set -euxo pipefail
+          ACTION_TYPE="${{ github.event.inputs.action_type || 'url' }}"
+          TARGET="${{ github.event.inputs.target || 'https://www.baidu.com' }}"
+          ./build_with_easter_egg.sh "$ACTION_TYPE" "$TARGET"
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-release-apk
+          path: build/app/outputs/flutter-apk/app-release.apk
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build-apk
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: app-release-apk
+          path: artifacts
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: artifacts/app-release.apk
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+
