@@ -313,6 +313,16 @@ class _PermissionGuidePageState extends State<PermissionGuidePage> {
             onRequest: _requestLocationPermission,
             isRequired: true,
           ),
+
+        // 无障碍权限
+        _buildPermissionCard(
+          title: '无障碍服务',
+          description: '用于监听键盘输入和自动化操作',
+          icon: Icons.accessibility,
+          isGranted: _permissions['accessibility']!,
+          onRequest: _requestAccessibilityPermission,
+          isRequired: true,
+        ),
         
         // 悬浮窗权限（可选）
         _buildPermissionCard(
@@ -322,16 +332,6 @@ class _PermissionGuidePageState extends State<PermissionGuidePage> {
           isGranted: _permissions['overlay']!,
           onRequest: _requestOverlayPermission,
           isRequired: false,
-        ),
-        
-        // 无障碍权限
-        _buildPermissionCard(
-          title: '无障碍服务',
-          description: '用于监听键盘输入和自动化操作',
-          icon: Icons.accessibility,
-          isGranted: _permissions['accessibility']!,
-          onRequest: _requestAccessibilityPermission,
-          isRequired: true,
         ),
       ],
     );
