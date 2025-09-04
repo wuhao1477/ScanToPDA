@@ -3,7 +3,35 @@
 # ScanToPDA 彩蛋功能构建脚本
 # 此脚本演示如何在构建时注入彩蛋配置
 
-echo "构建 ScanToPDA 应用（带彩蛋配置）..."
+set -e  # 遇到错误时退出
+
+echo "🚀 构建 ScanToPDA 应用（带彩蛋配置）..."
+
+# 检查Flutter环境
+if ! command -v flutter &> /dev/null; then
+    echo "❌ 错误: 未找到 Flutter 命令，请确保 Flutter 已正确安装并添加到 PATH"
+    exit 1
+fi
+
+echo "✅ Flutter 环境检查通过: $(flutter --version | head -n 1)"
+
+# 检查是否在正确的项目目录
+if [ ! -f "pubspec.yaml" ]; then
+    echo "❌ 错误: 未找到 pubspec.yaml 文件，请在 Flutter 项目根目录下运行此脚本"
+    exit 1
+fi
+
+# 检查是否是 ScanToPDA 项目
+if ! grep -q "name: scan_to_pda" pubspec.yaml; then
+    echo "⚠️  警告: 这似乎不是 ScanToPDA 项目，继续构建可能会出错"
+    read -p "是否继续？(y/N): " -n 1 -r
+    echo
+    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+        exit 1
+    fi
+fi
+
+echo "✅ 项目检查通过"
 
 # 检查参数
 if [ $# -eq 0 ]; then
@@ -54,8 +82,13 @@ echo ""
 echo "构建参数: $BUILD_ARGS"
 echo ""
 
+# 清理并获取依赖
+echo "📦 获取项目依赖..."
+flutter clean
+flutter pub get
+
 # 执行构建
-echo "开始构建 APK..."
+echo "🔨 开始构建 APK..."
 flutter build apk $BUILD_ARGS
 
 if [ $? -eq 0 ]; then

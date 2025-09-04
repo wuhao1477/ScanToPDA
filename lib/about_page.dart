@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:share_plus/share_plus.dart';
 import 'easter_egg_settings_page.dart';
 
 class AboutPage extends StatefulWidget {
@@ -340,9 +341,7 @@ class _AboutPageState extends State<AboutPage> {
               title: const Text('问题反馈'),
               subtitle: const Text('遇到问题或有改进建议？'),
               trailing: const Icon(Icons.arrow_forward_ios, size: 16),
-              onTap: () {
-                // TODO: 打开反馈页面或邮箱
-              },
+              onTap: () => _showFeedbackDialog(context),
             ),
             const Divider(),
             ListTile(
@@ -350,9 +349,7 @@ class _AboutPageState extends State<AboutPage> {
               title: const Text('应用评分'),
               subtitle: const Text('如果觉得好用，请给我们评分'),
               trailing: const Icon(Icons.arrow_forward_ios, size: 16),
-              onTap: () {
-                // TODO: 打开应用商店评分
-              },
+              onTap: () => _showRatingDialog(context),
             ),
             const Divider(),
             ListTile(
@@ -360,9 +357,7 @@ class _AboutPageState extends State<AboutPage> {
               title: const Text('分享应用'),
               subtitle: const Text('推荐给更多需要的朋友'),
               trailing: const Icon(Icons.arrow_forward_ios, size: 16),
-              onTap: () {
-                // TODO: 分享应用
-              },
+              onTap: () => _shareApp(),
             ),
           ],
         ),
@@ -650,5 +645,138 @@ limitations under the License.
         );
       },
     );
+  }
+
+  // 显示反馈对话框
+  void _showFeedbackDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Row(
+            children: [
+              Icon(Icons.feedback, color: Colors.blue),
+              SizedBox(width: 8),
+              Text('问题反馈'),
+            ],
+          ),
+          content: const SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text('感谢您使用 ScanToPDA！'),
+                SizedBox(height: 12),
+                Text('如果您遇到问题或有改进建议，可以通过以下方式联系我们：'),
+                SizedBox(height: 12),
+                Text('📧 邮箱: wuhao1477@gmail.com'),
+                Text('🐙 GitHub: github.com/wuhao1477/ScanToPDA'),
+                SizedBox(height: 12),
+                Text('请详细描述您遇到的问题或建议，我们会尽快回复。'),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('关闭'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+                _launchUrl('mailto:wuhao1477@gmail.com?subject=ScanToPDA 反馈');
+              },
+              child: const Text('发送邮件'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  // 显示评分对话框
+  void _showRatingDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Row(
+            children: [
+              Icon(Icons.star_rate, color: Colors.orange),
+              SizedBox(width: 8),
+              Text('应用评分'),
+            ],
+          ),
+          content: const Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text('如果您觉得 ScanToPDA 好用，请给我们评分！'),
+              SizedBox(height: 12),
+              Text('您的评分和评论是我们改进应用的重要动力。'),
+              SizedBox(height: 12),
+              Text('⭐ 5星好评可以帮助更多人发现这个应用'),
+              Text('💬 留下评论告诉我们您的使用体验'),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('稍后再说'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+                // 尝试打开应用商店，如果失败则显示提示
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('请在应用商店中搜索 "ScanToPDA" 进行评分'),
+                    duration: Duration(seconds: 3),
+                  ),
+                );
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.orange,
+                foregroundColor: Colors.white,
+              ),
+              child: const Text('去评分'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  // 分享应用
+  Future<void> _shareApp() async {
+    const String shareText = '''
+🚀 推荐一个好用的扫码助手 - ScanToPDA
+
+✨ 主要功能：
+• 蓝牙扫码枪监听
+• 广播接收器
+• 悬浮窗显示
+• 崩溃日志记录
+• 无障碍服务支持
+
+📱 专业的PDA扫码枪监听工具，支持多种扫码设备！
+
+🔗 项目地址: https://github.com/wuhao1477/ScanToPDA
+''';
+
+    try {
+      await Share.share(shareText);
+    } catch (e) {
+      // 如果分享失败，复制到剪贴板
+      await Clipboard.setData(const ClipboardData(text: shareText));
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('分享内容已复制到剪贴板'),
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+    }
   }
 }

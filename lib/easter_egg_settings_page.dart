@@ -58,6 +58,8 @@ class _EasterEggSettingsPageState extends State<EasterEggSettingsPage> {
       });
     } catch (e) {
       print('加载彩蛋设置失败: $e');
+      // 如果加载失败，使用环境变量的默认值，不显示错误给用户
+      // 因为这可能是首次使用，没有保存过设置
     }
   }
 
