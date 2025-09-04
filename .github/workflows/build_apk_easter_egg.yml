@@ -6,15 +6,25 @@ on:
       action_type:
         description: "Easter egg action type (app|url)"
         required: true
-        default: "url"
+        default: 'none'
+        type: choice
+        options:
+          - none
+          - app
+          - url
       target:
-        description: "Target package name (for app) or URL (for url)"
-        required: true
-        default: "https://www.baidu.com"
-      create_release:
-        description: "Create a GitHub Release for this manual run"
+        description: "🌐 目标网址 或 📱 应用包名 "
         required: false
-        default: "false"
+        type: string
+        default: ''
+      create_release:
+        description: "为此运行创建 GitHub Release"
+        required: true
+        default: 'false'
+        type: choice
+        options:
+          - true
+          - false
   push:
     tags:
       - 'v*.*.*'
