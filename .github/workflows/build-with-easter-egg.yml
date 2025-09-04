@@ -56,6 +56,9 @@ jobs:
       with:
         flutter-version: '3.16.0'
         
+    - name: Clean Android Java directory (force V2 embedding)
+      run: rm -rf android/app/src/main/java
+      
     - name: Get dependencies
       run: flutter pub get
       
