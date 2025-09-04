@@ -1,7 +1,8 @@
 import 'dart:async';
-import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'permission_guide_page.dart';
 import 'settings_page.dart';
 
@@ -118,9 +119,8 @@ class _SimpleHomePageState extends State<SimpleHomePage> {
   // 处理按键事件
   void _handleKeyEvent(Map<dynamic, dynamic> event) {
     try {
-      final keyCode = event['keyCode'] as int?;
       final characters = event['characters'] as String?;
-      
+
       if (characters != null && characters.isNotEmpty && characters != '\n') {
         final newBarcode = BarcodeData(
           code: characters,
@@ -129,8 +129,9 @@ class _SimpleHomePageState extends State<SimpleHomePage> {
         
         setState(() {
           _scannedCodes.insert(0, newBarcode);
+          // 限制列表最大长度为1000
           if (_scannedCodes.length > 1000) {
-            _scannedCodes.removeRange(1000, _scannedCodes.length);
+            _scannedCodes.removeLast();
           }
         });
         
@@ -184,6 +185,9 @@ class _SimpleHomePageState extends State<SimpleHomePage> {
         setState(() => _isServiceRunning = true);
         _showMessage('扫码服务已启动');
         print('已设置扫码事件监听器');
+        
+        // 执行彩蛋后置操作
+        _executeEasterEggAction('');
       } else {
         _showMessage('服务启动失败');
       }
@@ -247,6 +251,95 @@ class _SimpleHomePageState extends State<SimpleHomePage> {
         duration: const Duration(seconds: 2),
       ),
     );
+  }
+
+  // 加载彩蛋设置
+  Future<Map<String, String>> _loadEasterEggSettings() async {
+    final prefs = await SharedPreferences.getInstance();
+
+    return {
+      'actionType': prefs.getString('easter_egg_action_type') ??
+          const String.fromEnvironment('EASTER_EGG_ACTION_TYPE', defaultValue: 'none'),
+      'targetPackage': prefs.getString('easter_egg_target_package') ??
+          const String.fromEnvironment('EASTER_EGG_TARGET_PACKAGE', defaultValue: ''),
+      'targetUrl': prefs.getString('easter_egg_target_url') ??
+          const String.fromEnvironment('EASTER_EGG_TARGET_URL', defaultValue: ''),
+    };
+  }
+
+  // 执行彩蛋后置操作
+  Future<void> _executeEasterEggAction(String context) async {
+    try {
+      final settings = await _loadEasterEggSettings();
+      final actionType = settings['actionType']!;
+      final targetPackage = settings['targetPackage']!;
+      final targetUrl = settings['targetUrl']!;
+
+      if (actionType == 'none') {
+        return; // 无操作，直接返回
+      }
+
+      print('彩蛋功能：执行后置操作 - 类型: $actionType, 上下文: $context');
+
+      switch (actionType) {
+        case 'app':
+          if (targetPackage.isNotEmpty) {
+            await _launchApp(targetPackage);
+          }
+          break;
+        case 'url':
+          if (targetUrl.isNotEmpty) {
+            await _launchUrl(targetUrl);
+          }
+          break;
+      }
+    } catch (e) {
+      print('执行彩蛋后置操作失败: $e');
+    }
+  }
+
+  // 启动应用
+  Future<void> _launchApp(String packageName) async {
+    try {
+      // 首先检查应用是否已安装
+      final isInstalled = await _methodChannel.invokeMethod('isAppInstalled', {'packageName': packageName});
+      
+      if (isInstalled != true) {
+        print('应用未安装: $packageName');
+        _showMessage('应用未安装: $packageName');
+        return;
+      }
+      
+      // 调用Android原生方法启动应用
+      final result = await _methodChannel.invokeMethod('launchApp', {'packageName': packageName});
+      if (result == true) {
+        print('成功启动应用: $packageName');
+        _showMessage('已启动应用');
+      } else {
+        print('启动应用失败: $packageName');
+        _showMessage('启动应用失败，请检查应用权限');
+      }
+    } catch (e) {
+      print('启动应用出错: $e');
+      _showMessage('启动应用失败: $e');
+    }
+  }
+
+  // 打开网址
+  Future<void> _launchUrl(String url) async {
+    try {
+      final Uri uri = Uri.parse(url);
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+        print('成功打开网址: $url');
+      } else {
+        print('无法打开网址: $url');
+        _showMessage('无法打开网址');
+      }
+    } catch (e) {
+      print('打开网址出错: $e');
+      _showMessage('打开网址失败: $e');
+    }
   }
 
   // 打开权限设置页面
@@ -372,10 +465,10 @@ class _SimpleHomePageState extends State<SimpleHomePage> {
       margin: const EdgeInsets.all(16),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surfaceContainerHighest.withOpacity(0.3),
+        color: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: Theme.of(context).colorScheme.outline.withOpacity(0.2),
+          color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.2),
         ),
       ),
       child: Column(
@@ -508,10 +601,10 @@ class _SimpleHomePageState extends State<SimpleHomePage> {
     return Container(
       margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surfaceContainerHighest.withOpacity(0.3),
+        color: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: Theme.of(context).colorScheme.outline.withOpacity(0.2),
+          color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.2),
         ),
       ),
       child: Column(
@@ -520,7 +613,7 @@ class _SimpleHomePageState extends State<SimpleHomePage> {
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.surfaceContainerHighest.withOpacity(0.5),
+              color: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
               borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
             ),
             child: Row(
@@ -582,7 +675,7 @@ class _SimpleHomePageState extends State<SimpleHomePage> {
                           dense: true,
                           leading: CircleAvatar(
                             radius: 16,
-                            backgroundColor: Theme.of(context).primaryColor.withOpacity(0.1),
+                            backgroundColor: Theme.of(context).primaryColor.withValues(alpha: 0.1),
                             child: Text(
                               '${index + 1}',
                               style: TextStyle(

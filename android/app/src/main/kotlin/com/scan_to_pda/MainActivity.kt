@@ -13,6 +13,8 @@ import android.content.Context
 import android.net.Uri
 import android.provider.Settings
 import android.widget.Toast
+import android.content.pm.ApplicationInfo
+import android.content.pm.PackageInfo
 import android.content.pm.PackageManager
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
@@ -92,6 +94,28 @@ class MainActivity : FlutterActivity() {
                 "clearBarcodes" -> {
                     clearBarcodes()
                     result.success(true)
+                }
+                "launchApp" -> {
+                    val packageName = call.argument<String>("packageName")
+                    if (packageName != null) {
+                        val success = launchApp(packageName)
+                        result.success(success)
+                    } else {
+                        result.error("INVALID_ARGUMENT", "Package name is required", null)
+                    }
+                }
+                "isAppInstalled" -> {
+                    val packageName = call.argument<String>("packageName")
+                    if (packageName != null) {
+                        val isInstalled = isAppInstalled(packageName)
+                        result.success(isInstalled)
+                    } else {
+                        result.error("INVALID_ARGUMENT", "Package name is required", null)
+                    }
+                }
+                "getAllInstalledApps" -> {
+                    val apps = getAllInstalledApps()
+                    result.success(apps)
                 }
                 else -> result.notImplemented()
             }
@@ -370,6 +394,133 @@ class MainActivity : FlutterActivity() {
         // 这里应该清除存储的条码
         // 暂时为空实现，实际需要根据具体需求实现
         Log.d(TAG, "清除条码数据")
+    }
+    
+    // 启动指定应用
+    private fun launchApp(packageName: String): Boolean {
+        return try {
+            val packageManager = packageManager
+            
+            // 首先检查应用是否已安装
+            val isInstalled = try {
+                packageManager.getPackageInfo(packageName, 0)
+                true
+            } catch (e: PackageManager.NameNotFoundException) {
+                Log.w(TAG, "应用未安装: $packageName")
+                false
+            }
+            
+            if (!isInstalled) {
+                Log.w(TAG, "应用未安装: $packageName")
+                return false
+            }
+            
+            // 尝试方法1：使用 getLaunchIntentForPackage
+            var intent = packageManager.getLaunchIntentForPackage(packageName)
+            
+            if (intent == null) {
+                // 尝试方法2：查找主Activity
+                intent = Intent(Intent.ACTION_MAIN).apply {
+                    addCategory(Intent.CATEGORY_LAUNCHER)
+                    setPackage(packageName)
+                }
+                
+                val resolveInfos = packageManager.queryIntentActivities(intent, 0)
+                if (resolveInfos.isNotEmpty()) {
+                    val resolveInfo = resolveInfos[0]
+                    intent = Intent(Intent.ACTION_MAIN).apply {
+                        addCategory(Intent.CATEGORY_LAUNCHER)
+                        setClassName(packageName, resolveInfo.activityInfo.name)
+                    }
+                } else {
+                    Log.w(TAG, "无法找到应用的启动Activity: $packageName")
+                    return false
+                }
+            }
+            
+            // 设置Intent标志
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP)
+            intent.addFlags(Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED)
+            
+            // 启动应用
+            startActivity(intent)
+            Log.d(TAG, "成功启动应用: $packageName")
+            true
+            
+        } catch (e: Exception) {
+            Log.e(TAG, "启动应用失败: $packageName, 错误: ${e.message}")
+            e.printStackTrace()
+            false
+        }
+    }
+    
+    // 检查应用是否已安装
+    private fun isAppInstalled(packageName: String): Boolean {
+        return try {
+            val packageInfo = packageManager.getPackageInfo(packageName, 0)
+            Log.d(TAG, "应用已安装: $packageName, 版本: ${packageInfo.versionName}")
+            true
+        } catch (e: PackageManager.NameNotFoundException) {
+            Log.w(TAG, "应用未安装: $packageName")
+            false
+        } catch (e: Exception) {
+            Log.e(TAG, "检查应用安装状态失败: $packageName, 错误: ${e.message}")
+            false
+        }
+    }
+    
+    
+    // 获取所有已安装的应用（包含启动器图标的应用）
+    private fun getAllInstalledApps(): List<Map<String, String>> {
+        val apps = mutableListOf<Map<String, String>>()
+        val packageManager = packageManager
+        
+        try {
+            // 获取所有可以启动的应用
+            val intent = Intent(Intent.ACTION_MAIN).apply {
+                addCategory(Intent.CATEGORY_LAUNCHER)
+            }
+            
+            val resolveInfos = packageManager.queryIntentActivities(intent, 0)
+            Log.d(TAG, "找到 ${resolveInfos.size} 个可启动的应用")
+            
+            for (resolveInfo in resolveInfos) {
+                try {
+                    val packageName = resolveInfo.activityInfo.packageName
+                    val packageInfo = packageManager.getPackageInfo(packageName, 0)
+                    val appName = resolveInfo.loadLabel(packageManager).toString()
+                    
+                    // 只过滤掉当前应用
+                    if (packageName != this.packageName) {
+                        apps.add(mapOf(
+                            "packageName" to packageName,
+                            "appName" to appName,
+                            "versionName" to (packageInfo.versionName ?: "未知版本")
+                        ))
+                        Log.d(TAG, "找到应用: $appName ($packageName)")
+                    }
+                } catch (e: Exception) {
+                    Log.w(TAG, "获取应用信息失败: ${e.message}")
+                }
+            }
+            
+            // 按应用名称排序
+            apps.sortBy { it["appName"] }
+            
+        } catch (e: Exception) {
+            Log.e(TAG, "获取应用列表失败: ${e.message}")
+        }
+        
+        Log.d(TAG, "共找到 ${apps.size} 个可启动应用")
+        return apps
+    }
+    
+    // 检查是否为系统应用
+    private fun isSystemApp(packageInfo: PackageInfo): Boolean {
+        return packageInfo.applicationInfo?.let { appInfo ->
+            (appInfo.flags and ApplicationInfo.FLAG_SYSTEM) != 0
+        } ?: false
     }
     
     // 检查无障碍服务是否启用

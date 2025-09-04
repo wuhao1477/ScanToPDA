@@ -17,6 +17,9 @@ class _EasterEggSettingsPageState extends State<EasterEggSettingsPage> {
   String _targetUrl = '';
   String _selectedAppName = '';
   
+  // 方法通道
+  static const MethodChannel _methodChannel = MethodChannel('com.scan_to_pda/barcode_scanner');
+  
 
   @override
   void initState() {
@@ -88,26 +91,6 @@ class _EasterEggSettingsPageState extends State<EasterEggSettingsPage> {
     }
   }
 
-  // 根据包名获取应用显示名称
-  String _getAppDisplayName(String packageName) {
-    // 根据常见应用包名返回友好的显示名称
-    switch (packageName) {
-      case 'com.tencent.mm':
-        return '微信';
-      case 'com.tencent.mobileqq':
-        return 'QQ';
-      case 'com.eg.android.AlipayGphone':
-        return '支付宝';
-      case 'com.taobao.taobao':
-        return '淘宝';
-      case 'com.ss.android.ugc.aweme':
-        return '抖音';
-      case 'com.android.chrome':
-        return 'Chrome浏览器';
-      default:
-        return '自定义应用';
-    }
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -254,7 +237,7 @@ class _EasterEggSettingsPageState extends State<EasterEggSettingsPage> {
             TextField(
               decoration: const InputDecoration(
                 labelText: '应用包名',
-                hintText: '例如：com.tencent.mm（微信）',
+                hintText: '例如：com.example.app',
                 border: OutlineInputBorder(),
                 prefixIcon: Icon(Icons.android),
                 helperText: '输入要打开的应用的完整包名',
@@ -263,14 +246,26 @@ class _EasterEggSettingsPageState extends State<EasterEggSettingsPage> {
               onChanged: (value) {
                 setState(() {
                   _targetPackage = value;
-                  _selectedAppName = value.isNotEmpty ? _getAppDisplayName(value) : '';
+                  _selectedAppName = value.isNotEmpty ? value : '';
                 });
               },
             ),
             
             const SizedBox(height: 12),
             
-            // 常用应用包名提示
+            // 显示已安装应用按钮
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: _showAllInstalledApps,
+                icon: const Icon(Icons.apps),
+                label: const Text('选择已安装应用'),
+              ),
+            ),
+            
+            const SizedBox(height: 12),
+
+            // 提示信息
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
@@ -278,36 +273,9 @@ class _EasterEggSettingsPageState extends State<EasterEggSettingsPage> {
                 borderRadius: BorderRadius.circular(8),
                 border: Border.all(color: Colors.grey.shade200),
               ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    '常用应用包名：',
-                    style: TextStyle(
-                      fontWeight: FontWeight.w600,
-                      color: Colors.grey.shade700,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  const Text(
-                    '微信：com.tencent.mm\n'
-                    'QQ：com.tencent.mobileqq\n'
-                    '支付宝：com.eg.android.AlipayGphone\n'
-                    '淘宝：com.taobao.taobao\n'
-                    '抖音：com.ss.android.ugc.aweme\n'
-                    'Chrome：com.android.chrome',
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontFamily: 'monospace',
-                      height: 1.4,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  const Text(
-                    '提示：可以通过应用详情页面或开发者工具查看应用包名',
-                    style: TextStyle(fontSize: 11, color: Colors.grey),
-                  ),
-                ],
+              child: const Text(
+                '提示：可以通过应用详情页面或开发者工具查看应用包名，或直接点击下方按钮从已安装应用中选择。',
+                style: TextStyle(fontSize: 12, color: Colors.grey),
               ),
             ),
           ],
@@ -493,13 +461,46 @@ class _EasterEggSettingsPageState extends State<EasterEggSettingsPage> {
     switch (_actionType) {
       case 'app':
         if (_targetPackage.isNotEmpty) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('测试配置：打开应用 $_selectedAppName ($_targetPackage)'),
-              backgroundColor: Colors.blue,
-              duration: const Duration(seconds: 2),
-            ),
-          );
+          try {
+            // 首先检查应用是否已安装
+            final isInstalled = await _methodChannel.invokeMethod('isAppInstalled', {'packageName': _targetPackage});
+            
+            if (isInstalled != true) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('应用未安装：${_selectedAppName.isNotEmpty ? _selectedAppName : _targetPackage}'),
+                  backgroundColor: Colors.orange,
+                  duration: const Duration(seconds: 3),
+                ),
+              );
+              return;
+            }
+            
+            // 调用Android原生方法启动应用
+            final result = await _methodChannel.invokeMethod('launchApp', {'packageName': _targetPackage});
+            if (result == true) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('成功启动应用：${_selectedAppName.isNotEmpty ? _selectedAppName : _targetPackage}'),
+                  backgroundColor: Colors.green,
+                ),
+              );
+            } else {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('启动应用失败：${_selectedAppName.isNotEmpty ? _selectedAppName : _targetPackage}'),
+                  backgroundColor: Colors.red,
+                ),
+              );
+            }
+          } catch (e) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('启动应用失败：$e'),
+                backgroundColor: Colors.red,
+              ),
+            );
+          }
         } else {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
@@ -547,6 +548,106 @@ class _EasterEggSettingsPageState extends State<EasterEggSettingsPage> {
           );
         }
         break;
+    }
+  }
+
+
+  // 显示所有已安装应用列表
+  Future<void> _showAllInstalledApps() async {
+    try {
+      // 显示加载对话框
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (BuildContext context) {
+          return const AlertDialog(
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                CircularProgressIndicator(),
+                SizedBox(height: 16),
+                Text('正在获取应用列表...'),
+              ],
+            ),
+          );
+        },
+      );
+      
+      final apps = await _methodChannel.invokeMethod('getAllInstalledApps');
+      
+      // 关闭加载对话框
+      if (mounted) Navigator.of(context).pop();
+      
+      if (!mounted) return;
+      
+      if (apps is List && apps.isNotEmpty) {
+        showDialog(
+          context: context,
+          builder: (BuildContext context) {
+            return AlertDialog(
+              title: Text('所有已安装应用 (${apps.length}个)'),
+              content: SizedBox(
+                width: double.maxFinite,
+                height: 500,
+                child: ListView.builder(
+                  itemCount: apps.length,
+                  itemBuilder: (context, index) {
+                    final app = apps[index] as Map;
+                    final packageName = app['packageName'] as String;
+                    final appName = app['appName'] as String;
+                    final versionName = app['versionName'] as String;
+                    
+                    return ListTile(
+                      leading: const Icon(Icons.android),
+                      title: Text(appName),
+                      subtitle: Text('$packageName\n版本: $versionName'),
+                      isThreeLine: true,
+                      onTap: () {
+                        setState(() {
+                          _targetPackage = packageName;
+                          _selectedAppName = appName;
+                        });
+                        Navigator.of(context).pop();
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('已选择应用: $appName'),
+                            backgroundColor: Colors.green,
+                          ),
+                        );
+                      },
+                    );
+                  },
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: const Text('关闭'),
+                ),
+              ],
+            );
+          },
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('未找到已安装的应用'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+      }
+    } catch (e) {
+      // 关闭可能存在的加载对话框
+      if (mounted) {
+        Navigator.of(context).popUntil((route) => route.isFirst);
+      }
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('获取应用列表失败: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
     }
   }
 }
