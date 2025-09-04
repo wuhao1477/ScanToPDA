@@ -1,4 +1,4 @@
-package com.example.bluetooth2pda
+package com.example.scan_to_pda
 
 import android.app.Notification
 import android.app.NotificationChannel

@@ -1,4 +1,4 @@
-package com.example.bluetooth2pda
+package com.example.scan_to_pda
 
 import android.accessibilityservice.AccessibilityService
 import android.accessibilityservice.AccessibilityServiceInfo

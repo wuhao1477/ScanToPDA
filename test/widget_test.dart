@@ -8,7 +8,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:bluetooth2pda/main.dart';
+import 'package:scan_to_pda/main.dart';
 
 void main() {
   testWidgets('App should render title correctly', (WidgetTester tester) async {

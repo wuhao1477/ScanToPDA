@@ -1,11 +1,11 @@
 {
-    "name": "bluetooth2pda",
-    "short_name": "bluetooth2pda",
+    "name": "ScanToPDA",
+    "short_name": "ScanToPDA",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",
     "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "description": "ScanToPDA - A Flutter application for scanning barcodes and connecting to PDA devices via Bluetooth.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

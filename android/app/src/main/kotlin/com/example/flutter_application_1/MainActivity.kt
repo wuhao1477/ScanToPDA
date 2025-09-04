@@ -1,4 +1,4 @@
-package com.example.bluetooth2pda
+package com.example.scan_to_pda
 
 import android.content.Intent
 import android.os.Build
@@ -20,8 +20,8 @@ class MainActivity : FlutterActivity() {
         private const val OVERLAY_PERMISSION_REQ_CODE = 1234
     }
     
-    private val BARCODE_SCANNER_CHANNEL = "com.example.bluetooth2pda/barcode_scanner"
-    private val BARCODE_SCANNER_EVENT_CHANNEL = "com.example.bluetooth2pda/barcode_scanner_events"
+    private val BARCODE_SCANNER_CHANNEL = "com.example.scan_to_pda/barcode_scanner"
+    private val BARCODE_SCANNER_EVENT_CHANNEL = "com.example.scan_to_pda/barcode_scanner_events"
     
     private var eventSink: EventChannel.EventSink? = null
     

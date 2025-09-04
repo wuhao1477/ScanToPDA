@@ -7,4 +7,4 @@
     android:notificationTimeout="100"
     android:canRequestFilterKeyEvents="true"
     android:canRetrieveWindowContent="false"
-    android:settingsActivity="com.example.bluetooth2pda.MainActivity" /> 
+    android:settingsActivity="com.example.scan_to_pda.MainActivity" /> 

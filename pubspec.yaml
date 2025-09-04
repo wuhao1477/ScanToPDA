@@ -1,5 +1,5 @@
-name: bluetooth2pda
-description: A new Flutter project.
+name: scan_to_pda
+description: ScanToPDA - A Flutter application for scanning barcodes and connecting to PDA devices via Bluetooth.
 
 publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 

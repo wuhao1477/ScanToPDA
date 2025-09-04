@@ -1,6 +1,21 @@
-# bluetooth2pda
+# ScanToPDA
 
-A new Flutter project.
+ScanToPDA 是一个 Flutter 应用程序，用于扫描条形码并通过蓝牙连接到 PDA 设备。
+
+## 功能特性
+
+- 📱 条形码扫描
+- 🔗 蓝牙设备连接
+- 📊 PDA 数据传输
+- 🔄 实时数据同步
+- 🎯 后台服务支持
+
+## 技术栈
+
+- Flutter
+- Dart
+- Bluetooth Low Energy (BLE)
+- Android/iOS 原生集成
 
 ## Getting Started
 

@@ -25,7 +25,7 @@
     <uses-permission android:name="android.permission.BIND_ACCESSIBILITY_SERVICE" />
     
     <application
-        android:label="bluetooth2pda"
+        android:label="ScanToPDA"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity
