@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Flutter Application 1</string>
+    <string name="accessibility_service_description">蓝牙扫码枪服务：允许应用在后台接收蓝牙扫码枪输入，并转发为PDA扫码广播。</string>
+</resources> 

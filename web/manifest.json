@@ -1,6 +1,6 @@
 {
-    "name": "ScanToPDA",
-    "short_name": "ScanToPDA",
+    "name": "bluetooth2pda",
+    "short_name": "bluetooth2pda",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",

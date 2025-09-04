@@ -1,4 +1,4 @@
-name: ScanToPDA
+name: bluetooth2pda
 description: A new Flutter project.
 
 publish_to: 'none' # Remove this line if you wish to publish to pub.dev
@@ -12,8 +12,6 @@ dependencies:
   flutter:
     sdk: flutter
 
-  english_words: ^4.0.0
-  provider: ^6.0.0
   flutter_blue_plus: ^1.5.2
   permission_handler: ^11.0.0
 
@@ -22,6 +20,15 @@ dev_dependencies:
     sdk: flutter
 
   flutter_lints: ^2.0.0
+  flutter_launcher_icons: ^0.13.1
 
 flutter:
   uses-material-design: true
+
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: "logo.png"
+  adaptive_icon_background: "#ffffff"
+  adaptive_icon_foreground: "logo.png"
+  remove_alpha_ios: true

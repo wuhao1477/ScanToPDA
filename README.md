@@ -1,4 +1,4 @@
-# ScanToPDA
+# bluetooth2pda
 
 A new Flutter project.
 
