@@ -8,8 +8,10 @@ import android.app.Service
 import android.content.Context
 import android.content.Intent
 import android.graphics.PixelFormat
+import android.net.Uri
 import android.os.Build
 import android.os.IBinder
+import android.provider.Settings
 import android.util.Log
 import android.view.Gravity
 import android.view.LayoutInflater
@@ -57,7 +59,22 @@ class FloatingWindowService : Service() {
         // 在Android O及以上版本需要将服务设为前台服务
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val notification = createNotification()
-            startForeground(NOTIFICATION_ID, notification)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                // Android 10及以上版本需要指定前台服务类型
+                startForeground(NOTIFICATION_ID, notification, android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE)
+            } else {
+                startForeground(NOTIFICATION_ID, notification)
+            }
+        }
+        
+        // 检查悬浮窗权限
+        if (!hasOverlayPermission()) {
+            Log.e(TAG, "没有悬浮窗权限，无法创建悬浮窗")
+            // 发送广播通知权限不足
+            sendPermissionDeniedBroadcast()
+            // 停止服务
+            stopSelf()
+            return
         }
         
         // 初始化窗口管理器
@@ -69,11 +86,18 @@ class FloatingWindowService : Service() {
         // 初始化悬浮窗视图
         initializeFloatingView()
         
-        // 添加悬浮窗到屏幕
-        windowManager?.addView(floatingView, params)
-        
-        // 启动定时更新任务
-        startUpdateTimer()
+        try {
+            // 添加悬浮窗到屏幕
+            windowManager?.addView(floatingView, params)
+            Log.d(TAG, "悬浮窗创建成功")
+            
+            // 启动定时更新任务
+            startUpdateTimer()
+        } catch (e: Exception) {
+            Log.e(TAG, "创建悬浮窗失败: ${e.message}")
+            // 停止服务
+            stopSelf()
+        }
     }
     
     private fun createLayoutParams() {
@@ -303,6 +327,21 @@ class FloatingWindowService : Service() {
         if (floatingView != null && windowManager != null) {
             windowManager?.removeView(floatingView)
         }
+    }
+    
+    // 检查悬浮窗权限
+    private fun hasOverlayPermission(): Boolean {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            Settings.canDrawOverlays(this)
+        } else {
+            true // Android 6.0以下默认有权限
+        }
+    }
+    
+    // 发送权限不足广播
+    private fun sendPermissionDeniedBroadcast() {
+        val intent = Intent("com.example.scan_to_pda.OVERLAY_PERMISSION_DENIED")
+        sendBroadcast(intent)
     }
     
     // 创建通知

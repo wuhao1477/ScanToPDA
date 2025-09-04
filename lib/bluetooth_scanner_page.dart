@@ -693,40 +693,45 @@ class _BluetoothScannerPageState extends State<BluetoothScannerPage> with Widget
               Expanded(
                 child: _scannedCodes.isEmpty
                     ? Center(
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.all(24),
-                              decoration: BoxDecoration(
-                                color: Colors.blue.withOpacity(0.1),
-                                shape: BoxShape.circle,
+                        child: SingleChildScrollView(
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(20),
+                                decoration: BoxDecoration(
+                                  color: Colors.blue.withOpacity(0.1),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: Icon(
+                                  Icons.qr_code_scanner, 
+                                  size: 56, 
+                                  color: Colors.blue.withOpacity(0.7),
+                                ),
                               ),
-                              child: Icon(
-                                Icons.qr_code_scanner, 
-                                size: 64, 
-                                color: Colors.blue.withOpacity(0.7),
+                              const SizedBox(height: 16),
+                              Text(
+                                '还没有扫描记录',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w500,
+                                  color: Colors.grey[600],
+                                ),
                               ),
-                            ),
-                            const SizedBox(height: 24),
-                            Text(
-                              '还没有扫描记录',
-                              style: TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.w500,
-                                color: Colors.grey[600],
+                              const SizedBox(height: 6),
+                              Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                                child: Text(
+                                  '启动监听服务后，扫码记录将显示在这里',
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    color: Colors.grey[500],
+                                  ),
+                                  textAlign: TextAlign.center,
+                                ),
                               ),
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              '启动监听服务后，扫码记录将显示在这里',
-                              style: TextStyle(
-                                fontSize: 14,
-                                color: Colors.grey[500],
-                              ),
-                              textAlign: TextAlign.center,
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
                       )
                     : ListView.builder(

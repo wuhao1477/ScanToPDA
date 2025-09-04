@@ -75,7 +75,12 @@ class BarcodeScannerService : Service() {
         acquireWakeLock()
         
         // 启动为前台服务，增加服务优先级
-        startForeground(NOTIFICATION_ID, createNotification())
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            // Android 10及以上版本需要指定前台服务类型
+            startForeground(NOTIFICATION_ID, createNotification(), android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC)
+        } else {
+            startForeground(NOTIFICATION_ID, createNotification())
+        }
         
         // 发送一个心跳广播，让系统知道服务在运行
         startHeartbeatAlarm()
