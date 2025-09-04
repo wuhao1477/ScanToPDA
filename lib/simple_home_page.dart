@@ -47,8 +47,8 @@ class _SimpleHomePageState extends State<SimpleHomePage> {
   String _lastError = '';
   
   // 方法通道
-  static const MethodChannel _methodChannel = MethodChannel('com.example.scan_to_pda/barcode_scanner');
-  static const EventChannel _eventChannel = EventChannel('com.example.scan_to_pda/barcode_scanner_events');
+  static const MethodChannel _methodChannel = MethodChannel('com.scan_to_pda/barcode_scanner');
+  static const EventChannel _eventChannel = EventChannel('com.scan_to_pda/barcode_scanner_events');
   
   StreamSubscription? _eventSubscription;
   Timer? _statusCheckTimer;

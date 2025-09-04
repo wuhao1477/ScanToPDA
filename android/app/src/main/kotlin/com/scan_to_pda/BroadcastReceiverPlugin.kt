@@ -1,4 +1,4 @@
-package com.example.scan_to_pda
+package com.scan_to_pda
 
 import android.content.BroadcastReceiver
 import android.content.Context
@@ -24,10 +24,10 @@ class BroadcastReceiverPlugin : FlutterPlugin, MethodCallHandler, EventChannel.S
 
     override fun onAttachedToEngine(binding: FlutterPlugin.FlutterPluginBinding) {
         context = binding.applicationContext
-        methodChannel = MethodChannel(binding.binaryMessenger, "com.example.broadcast_receiver")
+        methodChannel = MethodChannel(binding.binaryMessenger, "com.scan_to_pda.broadcast_receiver")
         methodChannel.setMethodCallHandler(this)
 
-        eventChannel = EventChannel(binding.binaryMessenger, "com.example.broadcast_receiver/events")
+        eventChannel = EventChannel(binding.binaryMessenger, "com.scan_to_pda.broadcast_receiver/events")
         eventChannel.setStreamHandler(this)
     }
 

@@ -1,4 +1,4 @@
-package com.example.scan_to_pda
+package com.scan_to_pda
 
 import android.accessibilityservice.AccessibilityService
 import android.accessibilityservice.AccessibilityServiceInfo

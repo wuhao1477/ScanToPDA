@@ -1,4 +1,4 @@
-package com.example.scan_to_pda
+package com.scan_to_pda
 
 import android.content.Intent
 import android.os.Build
@@ -25,8 +25,8 @@ class MainActivity : FlutterActivity() {
         private const val LOCATION_PERMISSION_REQ_CODE = 1236
     }
     
-    private val BARCODE_SCANNER_CHANNEL = "com.example.scan_to_pda/barcode_scanner"
-    private val BARCODE_SCANNER_EVENT_CHANNEL = "com.example.scan_to_pda/barcode_scanner_events"
+    private val BARCODE_SCANNER_CHANNEL = "com.scan_to_pda/barcode_scanner"
+    private val BARCODE_SCANNER_EVENT_CHANNEL = "com.scan_to_pda/barcode_scanner_events"
     
     private var barcodeEventChannel: EventChannel? = null
     private var barcodeEventSink: EventChannel.EventSink? = null

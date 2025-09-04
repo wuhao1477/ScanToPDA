@@ -9,7 +9,7 @@ class PermissionGuidePage extends StatefulWidget {
 }
 
 class _PermissionGuidePageState extends State<PermissionGuidePage> with WidgetsBindingObserver {
-  static const platform = MethodChannel('com.example.scan_to_pda/barcode_scanner');
+  static const platform = MethodChannel('com.scan_to_pda/barcode_scanner');
   
   // 权限状态
   Map<String, bool> _permissions = {

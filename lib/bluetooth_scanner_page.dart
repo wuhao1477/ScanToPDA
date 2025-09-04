@@ -40,10 +40,10 @@ class _BluetoothScannerPageState extends State<BluetoothScannerPage> with Widget
   bool _isAccessibilityExpanded = false;
   
   // 创建方法通道，用于控制后台服务
-  static const MethodChannel _methodChannel = MethodChannel('com.example.scan_to_pda/barcode_scanner');
+  static const MethodChannel _methodChannel = MethodChannel('com.scan_to_pda/barcode_scanner');
 
   // 创建事件通道，用于接收扫码结果
-  static const EventChannel _eventChannel = EventChannel('com.example.scan_to_pda/barcode_scanner_events');
+  static const EventChannel _eventChannel = EventChannel('com.scan_to_pda/barcode_scanner_events');
   
   StreamSubscription? _eventSubscription;
   

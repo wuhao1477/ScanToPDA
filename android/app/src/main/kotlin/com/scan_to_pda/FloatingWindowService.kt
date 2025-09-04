@@ -1,4 +1,4 @@
-package com.example.scan_to_pda
+package com.scan_to_pda
 
 import android.app.Notification
 import android.app.NotificationChannel
@@ -354,7 +354,7 @@ class FloatingWindowService : Service() {
     
     // 发送权限不足广播
     private fun sendPermissionDeniedBroadcast() {
-        val intent = Intent("com.example.scan_to_pda.OVERLAY_PERMISSION_DENIED")
+        val intent = Intent("com.scan_to_pda.OVERLAY_PERMISSION_DENIED")
         sendBroadcast(intent)
     }
     

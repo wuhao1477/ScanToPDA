@@ -122,7 +122,7 @@ class CrashLogPage extends StatefulWidget {
 }
 
 class _CrashLogPageState extends State<CrashLogPage> {
-  static const MethodChannel _crashLogChannel = MethodChannel('com.example.scan_to_pda/crash_log');
+  static const MethodChannel _crashLogChannel = MethodChannel('com.scan_to_pda/crash_log');
 
   List<CrashLogData> _crashLogs = [];
   List<CrashLogData>? _filteredLogsCache;

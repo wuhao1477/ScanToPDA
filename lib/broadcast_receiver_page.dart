@@ -36,8 +36,8 @@ class _BroadcastReceiverPageState extends State<BroadcastReceiverPage> {
   bool _onlyShowPdaScan = false;
 
   // 定义Method Channel
-  static const platform = MethodChannel('com.example.broadcast_receiver');
-  static const broadcastEventChannel = EventChannel('com.example.broadcast_receiver/events');
+  static const platform = MethodChannel('com.scan_to_pda.broadcast_receiver');
+  static const broadcastEventChannel = EventChannel('com.scan_to_pda.broadcast_receiver/events');
   StreamSubscription? _broadcastSubscription;
 
   // PDA 扫码枪常见的广播 Action 列表
