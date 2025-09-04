@@ -1,4 +1,4 @@
-package com.example.scan_to_pda
+package com.example.flutter_application_1
 
 import android.app.Notification
 import android.app.NotificationChannel
@@ -61,10 +61,14 @@ class FloatingWindowService : Service() {
             val notification = createNotification()
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                 // Android 10及以上版本需要指定前台服务类型
+                Log.d(TAG, "启动带类型的前台服务 (API ${Build.VERSION.SDK_INT})")
                 startForeground(NOTIFICATION_ID, notification, android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE)
             } else {
+                Log.d(TAG, "启动基础前台服务 (API ${Build.VERSION.SDK_INT})")
                 startForeground(NOTIFICATION_ID, notification)
             }
+        } else {
+            Log.d(TAG, "当前版本无需前台服务 (API ${Build.VERSION.SDK_INT})")
         }
         
         // 检查悬浮窗权限
@@ -95,19 +99,27 @@ class FloatingWindowService : Service() {
             startUpdateTimer()
         } catch (e: Exception) {
             Log.e(TAG, "创建悬浮窗失败: ${e.message}")
+            // 发送权限问题广播
+            sendPermissionDeniedBroadcast()
             // 停止服务
             stopSelf()
         }
     }
     
     private fun createLayoutParams() {
+        // 根据Android版本确定悬浮窗类型
+        val windowType = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            Log.d(TAG, "使用TYPE_APPLICATION_OVERLAY悬浮窗类型 (API ${Build.VERSION.SDK_INT})")
+            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
+        } else {
+            Log.d(TAG, "使用TYPE_PHONE悬浮窗类型 (API ${Build.VERSION.SDK_INT})")
+            WindowManager.LayoutParams.TYPE_PHONE
+        }
+        
         params = WindowManager.LayoutParams(
             WindowManager.LayoutParams.WRAP_CONTENT,
             WindowManager.LayoutParams.WRAP_CONTENT,
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
-                WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
-            else
-                WindowManager.LayoutParams.TYPE_PHONE,
+            windowType,
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
             PixelFormat.TRANSLUCENT
         )
@@ -119,16 +131,21 @@ class FloatingWindowService : Service() {
     }
     
     private fun initializeFloatingView() {
-        // 加载悬浮窗布局
-        val inflater = getSystemService(Context.LAYOUT_INFLATER_SERVICE) as LayoutInflater
-        floatingView = inflater.inflate(R.layout.floating_window_layout, null)
+        // 创建简单的文本视图作为悬浮窗内容
+        floatingView = android.widget.TextView(this).apply {
+            text = "扫码悬浮窗"
+            setTextColor(android.graphics.Color.WHITE)
+            setBackgroundColor(android.graphics.Color.parseColor("#80000000"))
+            setPadding(20, 10, 20, 10)
+            textSize = 14f
+        }
         
-        // 初始化视图组件
-        tvStatus = floatingView?.findViewById(R.id.tv_status)
-        tvLastCode = floatingView?.findViewById(R.id.tv_last_code)
-        btnClose = floatingView?.findViewById(R.id.btn_close)
-        btnCollapse = floatingView?.findViewById(R.id.btn_collapse)
-        btnExpand = floatingView?.findViewById(R.id.btn_expand)
+        // 初始化视图组件（简化版本）
+        tvStatus = floatingView as? android.widget.TextView
+        tvLastCode = null
+        btnClose = null
+        btnCollapse = null
+        btnExpand = null
         
         // 设置关闭按钮点击事件
         btnClose?.setOnClickListener {
@@ -145,15 +162,7 @@ class FloatingWindowService : Service() {
             expandView()
         }
         
-        // 设置启动服务按钮
-        floatingView?.findViewById<Button>(R.id.btn_start_service)?.setOnClickListener {
-            startBarcodeScannerService()
-        }
-        
-        // 设置停止服务按钮
-        floatingView?.findViewById<Button>(R.id.btn_stop_service)?.setOnClickListener {
-            stopBarcodeScannerService()
-        }
+        // 简化版本，移除按钮控制功能
         
         // 设置拖动事件
         setupDragToMove()
@@ -267,15 +276,7 @@ class FloatingWindowService : Service() {
         } else {
             "无障碍: 未启用"
         }
-        floatingView?.findViewById<TextView>(R.id.tv_accessibility_status)?.let { tv ->
-            tv.text = accessText
-            tv.setTextColor(
-                resources.getColor(
-                    if (accessibilityService != null) android.R.color.holo_green_dark 
-                    else android.R.color.holo_red_light
-                )
-            )
-        }
+        // 简化版本，移除无障碍状态显示
     }
     
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -331,10 +332,23 @@ class FloatingWindowService : Service() {
     
     // 检查悬浮窗权限
     private fun hasOverlayPermission(): Boolean {
-        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            Settings.canDrawOverlays(this)
-        } else {
-            true // Android 6.0以下默认有权限
+        return try {
+            val hasPermission = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                Settings.canDrawOverlays(this)
+            } else {
+                true // Android 6.0以下默认有权限
+            }
+            
+            Log.d(TAG, "悬浮窗权限检查结果: $hasPermission (API ${Build.VERSION.SDK_INT})")
+            
+            if (!hasPermission) {
+                Log.w(TAG, "悬浮窗权限不足，需要用户手动授权")
+            }
+            
+            hasPermission
+        } catch (e: Exception) {
+            Log.e(TAG, "检查悬浮窗权限失败: ${e.message}")
+            false
         }
     }
     
@@ -360,26 +374,52 @@ class FloatingWindowService : Service() {
         
         // 创建通知点击Intent
         val intent = Intent(this, MainActivity::class.java)
-        val pendingIntent = PendingIntent.getActivity(
-            this,
-            0,
-            intent,
-            PendingIntent.FLAG_IMMUTABLE
-        )
         
-        // 构建通知
+        // 根据Android版本创建合适的PendingIntent
+        val pendingIntent = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            PendingIntent.getActivity(
+                this,
+                0,
+                intent,
+                PendingIntent.FLAG_IMMUTABLE
+            )
+        } else {
+            PendingIntent.getActivity(
+                this,
+                0,
+                intent,
+                PendingIntent.FLAG_UPDATE_CURRENT
+            )
+        }
+        
+        // 构建通知，根据版本兼容性调整
         val notificationBuilder = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             NotificationCompat.Builder(this, NOTIFICATION_CHANNEL_ID)
         } else {
+            @Suppress("DEPRECATION")
             NotificationCompat.Builder(this)
+                .setPriority(NotificationCompat.PRIORITY_LOW)
+        }
+        
+        // 获取悬浮窗状态用于通知内容
+        val hasPermission = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            Settings.canDrawOverlays(this)
+        } else {
+            true
+        }
+        val contentText = if (hasPermission) {
+            "悬浮窗正在后台运行"
+        } else {
+            "悬浮窗权限不足，请检查权限设置"
         }
         
         return notificationBuilder
             .setContentTitle("扫码悬浮窗")
-            .setContentText("蓝牙扫码服务在后台运行")
-            .setSmallIcon(R.mipmap.ic_launcher)
+            .setContentText(contentText)
+            .setSmallIcon(android.R.drawable.ic_menu_info_details)
             .setContentIntent(pendingIntent)
-            .setPriority(NotificationCompat.PRIORITY_LOW)
+            .setAutoCancel(false)
+            .setOngoing(true)
             .build()
     }
     

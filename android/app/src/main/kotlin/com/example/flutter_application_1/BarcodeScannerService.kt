@@ -1,4 +1,4 @@
-package com.example.scan_to_pda
+package com.example.flutter_application_1
 
 import android.app.Notification
 import android.app.NotificationChannel
@@ -68,18 +68,30 @@ class BarcodeScannerService : Service() {
         Log.d(TAG, "服务创建")
         instance = this
         
+        // 检查蓝牙权限兼容性
+        if (!checkBluetoothPermissions()) {
+            Log.w(TAG, "蓝牙权限不足，服务功能可能受限")
+        }
+        
         // 创建通知渠道
         createNotificationChannel()
         
         // 获取唤醒锁
         acquireWakeLock()
         
-        // 启动为前台服务，增加服务优先级
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            // Android 10及以上版本需要指定前台服务类型
-            startForeground(NOTIFICATION_ID, createNotification(), android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC)
+        // 在Android O及以上版本需要将服务设为前台服务
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val notification = createNotification()
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                // Android 10及以上版本需要指定前台服务类型
+                Log.d(TAG, "启动带类型的前台服务 (API ${Build.VERSION.SDK_INT})")
+                startForeground(NOTIFICATION_ID, notification, android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC)
+            } else {
+                Log.d(TAG, "启动基础前台服务 (API ${Build.VERSION.SDK_INT})")
+                startForeground(NOTIFICATION_ID, notification)
+            }
         } else {
-            startForeground(NOTIFICATION_ID, createNotification())
+            Log.d(TAG, "当前版本无需前台服务 (API ${Build.VERSION.SDK_INT})")
         }
         
         // 发送一个心跳广播，让系统知道服务在运行
@@ -89,12 +101,24 @@ class BarcodeScannerService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         Log.d(TAG, "服务启动")
         
+        // 重新检查蓝牙权限（权限可能在运行时被撤销）
+        if (!checkBluetoothPermissions()) {
+            Log.w(TAG, "服务启动时发现蓝牙权限不足")
+        }
+        
         // 如果服务被系统杀死并重新创建，确保重新获取唤醒锁
         if (wakeLock == null || !wakeLock!!.isHeld) {
             acquireWakeLock()
         }
         
-        return START_STICKY // 服务被杀死后自动重启
+        // 根据版本决定返回值
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            // 有前台服务保护，使用STICKY重启
+            START_STICKY
+        } else {
+            // 低版本Android，服务可能更容易被杀死，使用STICKY重启
+            START_STICKY
+        }
     }
     
     override fun onDestroy() {
@@ -294,15 +318,53 @@ class BarcodeScannerService : Service() {
     // 创建通知
     private fun createNotification(): Notification {
         val notificationIntent = Intent(this, MainActivity::class.java)
-        val pendingIntent = PendingIntent.getActivity(
-            this, 0, notificationIntent, PendingIntent.FLAG_IMMUTABLE
-        )
         
-        return NotificationCompat.Builder(this, NOTIFICATION_CHANNEL_ID)
+        // 根据Android版本创建合适的PendingIntent
+        val pendingIntent = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            PendingIntent.getActivity(
+                this, 0, notificationIntent, PendingIntent.FLAG_IMMUTABLE
+            )
+        } else {
+            PendingIntent.getActivity(
+                this, 0, notificationIntent, PendingIntent.FLAG_UPDATE_CURRENT
+            )
+        }
+        
+        // 构建通知，根据版本兼容性调整
+        val builder = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            // Android 8.0及以上使用通知渠道
+            NotificationCompat.Builder(this, NOTIFICATION_CHANNEL_ID)
+        } else {
+            // Android 8.0以下使用旧版构造器
+            @Suppress("DEPRECATION")
+            NotificationCompat.Builder(this)
+                .setPriority(NotificationCompat.PRIORITY_LOW)
+        }
+        
+        // 获取权限状态用于通知内容  
+        val hasBluetoothPermissions = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            // Android 12及以上使用新的蓝牙权限
+            checkSelfPermission(android.Manifest.permission.BLUETOOTH_SCAN) == android.content.pm.PackageManager.PERMISSION_GRANTED &&
+                    checkSelfPermission(android.Manifest.permission.BLUETOOTH_CONNECT) == android.content.pm.PackageManager.PERMISSION_GRANTED
+        } else {
+            // Android 12以下使用传统蓝牙权限
+            checkSelfPermission(android.Manifest.permission.BLUETOOTH) == android.content.pm.PackageManager.PERMISSION_GRANTED &&
+                    checkSelfPermission(android.Manifest.permission.BLUETOOTH_ADMIN) == android.content.pm.PackageManager.PERMISSION_GRANTED
+        }
+        
+        val contentText = if (hasBluetoothPermissions) {
+            "正在后台监听蓝牙扫码枪输入"
+        } else {
+            "蓝牙权限不足，请检查权限设置"
+        }
+        
+        return builder
             .setContentTitle("蓝牙扫码监听")
-            .setContentText("正在后台监听蓝牙扫码枪输入")
-            .setSmallIcon(R.mipmap.ic_launcher)
+            .setContentText(contentText)
+            .setSmallIcon(android.R.drawable.ic_menu_info_details)
             .setContentIntent(pendingIntent)
+            .setAutoCancel(false)
+            .setOngoing(true)
             .build()
     }
     
@@ -323,6 +385,42 @@ class BarcodeScannerService : Service() {
             Log.d(TAG, "停止心跳广播")
         } catch (e: Exception) {
             Log.e(TAG, "停止心跳广播失败: ${e.message}")
+        }
+    }
+    
+    // 检查蓝牙权限
+    private fun checkBluetoothPermissions(): Boolean {
+        return try {
+            val hasPermissions = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                // Android 12及以上使用新的蓝牙权限
+                checkSelfPermission(android.Manifest.permission.BLUETOOTH_SCAN) == android.content.pm.PackageManager.PERMISSION_GRANTED &&
+                        checkSelfPermission(android.Manifest.permission.BLUETOOTH_CONNECT) == android.content.pm.PackageManager.PERMISSION_GRANTED
+            } else {
+                // Android 12以下使用传统蓝牙权限
+                checkSelfPermission(android.Manifest.permission.BLUETOOTH) == android.content.pm.PackageManager.PERMISSION_GRANTED &&
+                        checkSelfPermission(android.Manifest.permission.BLUETOOTH_ADMIN) == android.content.pm.PackageManager.PERMISSION_GRANTED
+            }
+            
+            Log.d(TAG, "蓝牙权限检查结果: $hasPermissions (API ${Build.VERSION.SDK_INT})")
+            
+            if (!hasPermissions) {
+                Log.w(TAG, "蓝牙权限不足")
+                
+                // 检查位置权限（Android 6.0-11需要）
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && Build.VERSION.SDK_INT < Build.VERSION_CODES.S) {
+                    val hasLocationPermission = checkSelfPermission(android.Manifest.permission.ACCESS_FINE_LOCATION) == android.content.pm.PackageManager.PERMISSION_GRANTED ||
+                            checkSelfPermission(android.Manifest.permission.ACCESS_COARSE_LOCATION) == android.content.pm.PackageManager.PERMISSION_GRANTED
+                    Log.d(TAG, "位置权限检查结果: $hasLocationPermission")
+                    if (!hasLocationPermission) {
+                        Log.w(TAG, "蓝牙扫描需要位置权限，但权限不足")
+                    }
+                }
+            }
+            
+            hasPermissions
+        } catch (e: Exception) {
+            Log.e(TAG, "检查蓝牙权限失败: ${e.message}")
+            false
         }
     }
     

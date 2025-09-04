@@ -1,4 +1,4 @@
-package com.example.scan_to_pda
+package com.example.flutter_application_1
 
 import android.accessibilityservice.AccessibilityService
 import android.accessibilityservice.AccessibilityServiceInfo

@@ -1,4 +1,4 @@
-package com.example.scan_to_pda
+package com.example.flutter_application_1
 
 import android.content.Intent
 import android.os.Build
@@ -13,337 +13,155 @@ import android.content.Context
 import android.net.Uri
 import android.provider.Settings
 import android.widget.Toast
+import android.content.pm.PackageManager
+import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
 
 class MainActivity : FlutterActivity() {
     companion object {
         private const val TAG = "MainActivity"
         private const val OVERLAY_PERMISSION_REQ_CODE = 1234
+        private const val BLUETOOTH_PERMISSION_REQ_CODE = 1235
+        private const val LOCATION_PERMISSION_REQ_CODE = 1236
     }
     
     private val BARCODE_SCANNER_CHANNEL = "com.example.scan_to_pda/barcode_scanner"
     private val BARCODE_SCANNER_EVENT_CHANNEL = "com.example.scan_to_pda/barcode_scanner_events"
-    private val CRASH_LOG_CHANNEL = "com.example.scan_to_pda/crash_log"
     
-    private var eventSink: EventChannel.EventSink? = null
-    private var crashLogDatabaseHelper: CrashLogDatabaseHelper? = null
-    
-    // 跟踪上一次处理的按键事件
-    private var lastKeyDownCode: Int = -1
-    private var lastKeyDownTime: Long = 0
+    private var barcodeEventChannel: EventChannel? = null
+    private var barcodeEventSink: EventChannel.EventSink? = null
     
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
         
-        // 初始化崩溃日志数据库助手
-        crashLogDatabaseHelper = CrashLogDatabaseHelper.getInstance(this)
-        
-        // 设置方法通道，用于控制服务
+        // 条码扫描器MethodChannel
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, BARCODE_SCANNER_CHANNEL).setMethodCallHandler { call, result ->
             when (call.method) {
                 "startService" -> {
-                    startBarcodeScannerService()
+                    startBarcodeService()
                     result.success(true)
                 }
                 "stopService" -> {
-                    stopBarcodeScannerService()
+                    stopBarcodeService()
                     result.success(true)
                 }
-                "getScannedBarcodes" -> {
-                    val barcodes = getScannedBarcodes()
-                    result.success(barcodes)
-                }
-                "clearBarcodes" -> {
-                    clearBarcodes()
+                "startFloatingWindow" -> {
+                    startFloatingWindow()
                     result.success(true)
                 }
-                "simulateBarcodeScan" -> {
-                    val code = call.argument<String>("code")
-                    val timestamp = call.argument<Long>("timestamp") ?: System.currentTimeMillis()
-                    
-                    if (code != null) {
-                        val service = BarcodeScannerService.getInstance()
-                        service?.addBarcode(code)
-                        result.success(true)
-                    } else {
-                        result.success(false)
-                    }
-                }
-                "showFloatingWindow" -> {
-                    startFloatingWindowService()
-                    result.success(true)
-                }
-                "hideFloatingWindow" -> {
-                    stopFloatingWindowService()
+                "stopFloatingWindow" -> {
+                    stopFloatingWindow()
                     result.success(true)
                 }
                 "requestOverlayPermission" -> {
                     requestOverlayPermission()
                     result.success(true)
                 }
-                "requestAccessibilityPermission" -> {
-                    requestAccessibilityPermission()
+                "requestBluetoothPermissions" -> {
+                    requestBluetoothPermissions()
                     result.success(true)
                 }
-                "isAccessibilityServiceEnabled" -> {
-                    val isEnabled = isAccessibilityServiceEnabled()
-                    result.success(isEnabled)
+                "requestLocationPermissions" -> {
+                    requestLocationPermissions()
+                    result.success(true)
                 }
-                else -> {
-                    result.notImplemented()
+                "requestAllRequiredPermissions" -> {
+                    requestAllRequiredPermissions()
+                    result.success(true)
                 }
+                "getDeviceCompatibility" -> {
+                    val info = getDeviceCompatibilityInfo()
+                    result.success(info)
+                }
+                "hasBluetoothPermissions" -> {
+                    val hasPermissions = hasBluetoothPermissions()
+                    result.success(hasPermissions)
+                }
+                else -> result.notImplemented()
             }
         }
         
-        // 设置崩溃日志方法通道
-        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CRASH_LOG_CHANNEL).setMethodCallHandler { call, result ->
-            when (call.method) {
-                "getCrashLogs" -> {
-                    val crashLogs = crashLogDatabaseHelper?.getAllCrashLogs() ?: emptyList()
-                    val crashLogsJson = crashLogs.map { crashLog ->
-                        mapOf(
-                            "id" to crashLog.id,
-                            "timestamp" to crashLog.timestamp,
-                            "formattedTime" to crashLog.getFormattedTime(),
-                            "crashType" to crashLog.crashType,
-                            "errorMessage" to crashLog.errorMessage,
-                            "shortDescription" to crashLog.getShortDescription(),
-                            "stackTrace" to crashLog.stackTrace,
-                            "deviceInfo" to crashLog.deviceInfo,
-                            "appVersion" to crashLog.appVersion,
-                            "androidVersion" to crashLog.androidVersion,
-                            "deviceModel" to crashLog.deviceModel,
-                            "availableMemory" to crashLog.availableMemory,
-                            "totalMemory" to crashLog.totalMemory,
-                            "isRead" to crashLog.isRead
-                        )
-                    }
-                    result.success(crashLogsJson)
-                }
-                "getCrashLogById" -> {
-                    val id = call.argument<Long>("id")
-                    if (id != null) {
-                        val crashLog = crashLogDatabaseHelper?.getCrashLogById(id)
-                        if (crashLog != null) {
-                            val crashLogJson = mapOf(
-                                "id" to crashLog.id,
-                                "timestamp" to crashLog.timestamp,
-                                "formattedTime" to crashLog.getFormattedTime(),
-                                "crashType" to crashLog.crashType,
-                                "errorMessage" to crashLog.errorMessage,
-                                "shortDescription" to crashLog.getShortDescription(),
-                                "stackTrace" to crashLog.stackTrace,
-                                "deviceInfo" to crashLog.deviceInfo,
-                                "appVersion" to crashLog.appVersion,
-                                "androidVersion" to crashLog.androidVersion,
-                                "deviceModel" to crashLog.deviceModel,
-                                "availableMemory" to crashLog.availableMemory,
-                                "totalMemory" to crashLog.totalMemory,
-                                "isRead" to crashLog.isRead
-                            )
-                            result.success(crashLogJson)
-                        } else {
-                            result.success(null)
-                        }
-                    } else {
-                        result.error("INVALID_ARGUMENT", "Missing crash log id", null)
-                    }
-                }
-                "markCrashLogAsRead" -> {
-                    val id = call.argument<Long>("id")
-                    if (id != null) {
-                        val success = crashLogDatabaseHelper?.markCrashLogAsRead(id) ?: false
-                        result.success(success)
-                    } else {
-                        result.error("INVALID_ARGUMENT", "Missing crash log id", null)
-                    }
-                }
-                "deleteCrashLog" -> {
-                    val id = call.argument<Long>("id")
-                    if (id != null) {
-                        val success = crashLogDatabaseHelper?.deleteCrashLog(id) ?: false
-                        result.success(success)
-                    } else {
-                        result.error("INVALID_ARGUMENT", "Missing crash log id", null)
-                    }
-                }
-                "clearAllCrashLogs" -> {
-                    val success = crashLogDatabaseHelper?.clearAllCrashLogs() ?: false
-                    result.success(success)
-                }
-                "getCrashLogCount" -> {
-                    val count = crashLogDatabaseHelper?.getCrashLogCount() ?: 0
-                    result.success(count)
-                }
-                "getUnreadCrashLogCount" -> {
-                    val count = crashLogDatabaseHelper?.getUnreadCrashLogCount() ?: 0
-                    result.success(count)
-                }
-                "exportCrashLog" -> {
-                    val id = call.argument<Long>("id")
-                    val format = call.argument<String>("format") ?: "txt"
-                    if (id != null) {
-                        val crashLog = crashLogDatabaseHelper?.getCrashLogById(id)
-                        if (crashLog != null) {
-                            val exportData = when (format.lowercase()) {
-                                "json" -> crashLog.toJsonFormat()
-                                else -> crashLog.toTextFormat()
-                            }
-                            result.success(exportData)
-                        } else {
-                            result.error("NOT_FOUND", "Crash log not found", null)
-                        }
-                    } else {
-                        result.error("INVALID_ARGUMENT", "Missing crash log id", null)
-                    }
-                }
-                "testCrash" -> {
-                    // 用于测试的崩溃方法
-                    try {
-                        Thread {
-                            throw RuntimeException("这是一个测试崩溃")
-                        }.start()
-                        result.success(true)
-                    } catch (e: Exception) {
-                        result.error("TEST_CRASH_FAILED", "Failed to create test crash", null)
-                    }
-                }
-                else -> {
-                    result.notImplemented()
-                }
+        // 条码扫描器EventChannel
+        barcodeEventChannel = EventChannel(flutterEngine.dartExecutor.binaryMessenger, BARCODE_SCANNER_EVENT_CHANNEL)
+        barcodeEventChannel?.setStreamHandler(object : EventChannel.StreamHandler {
+            override fun onListen(arguments: Any?, events: EventChannel.EventSink?) {
+                barcodeEventSink = events
+                Log.d(TAG, "条码事件流开始监听")
             }
-        }
-        
-        // 设置事件通道，用于推送扫码结果
-        EventChannel(flutterEngine.dartExecutor.binaryMessenger, BARCODE_SCANNER_EVENT_CHANNEL).setStreamHandler(
-            object : EventChannel.StreamHandler {
-                override fun onListen(arguments: Any?, events: EventChannel.EventSink) {
-                    eventSink = events
-                    BarcodeScannerService.setEventSink(events)
-                }
-                
-                override fun onCancel(arguments: Any?) {
-                    eventSink = null
-                    BarcodeScannerService.setEventSink(null)
-                }
+            
+            override fun onCancel(arguments: Any?) {
+                barcodeEventSink = null
+                Log.d(TAG, "条码事件流取消监听")
             }
-        )
+        })
     }
     
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        
-        // 初始化崩溃处理器
-        CrashHandler.getInstance().init(this)
-        
-        // 启动ANR检测（可选）
-        CrashHandler.getInstance().startAnrDetection()
-        
-        // 应用启动时不自动请求权限和启动服务
+        Log.d(TAG, "MainActivity创建完成")
     }
     
-    override fun onDestroy() {
-        super.onDestroy()
+    override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
+        // 将按键事件发送到Flutter
+        val keyData = mapOf(
+            "keyCode" to keyCode,
+            "scanCode" to (event?.scanCode ?: 0),
+            "action" to (event?.action ?: 0),
+            "metaState" to (event?.metaState ?: 0),
+            "repeatCount" to (event?.repeatCount ?: 0),
+            "displayLabel" to (event?.displayLabel?.toString() ?: ""),
+            "unicodeChar" to (event?.unicodeChar ?: 0),
+            "characters" to (event?.characters ?: ""),
+            "timestamp" to System.currentTimeMillis()
+        )
         
-        // 停止ANR检测，避免内存泄漏
-        CrashHandler.getInstance().stopAnrDetection()
+        barcodeEventSink?.success(keyData)
         
-        // 清理事件接收器
-        eventSink = null
-        
-        // 应用销毁时不要停止服务，保持后台运行
-        // stopBarcodeScannerService()
+        return super.onKeyDown(keyCode, event)
     }
     
-    // 启动扫码服务
-    private fun startBarcodeScannerService() {
-        val serviceIntent = Intent(this, BarcodeScannerService::class.java)
-        
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            startForegroundService(serviceIntent)
-        } else {
-            startService(serviceIntent)
-        }
-    }
-    
-    // 停止扫码服务
-    private fun stopBarcodeScannerService() {
-        val serviceIntent = Intent(this, BarcodeScannerService::class.java)
-        stopService(serviceIntent)
-    }
-    
-    // 获取已扫描的条码
-    private fun getScannedBarcodes(): List<String> {
-        val service = BarcodeScannerService.getInstance()
-        return service?.getScannedBarcodes() ?: ArrayList()
-    }
-    
-    // 清空扫描记录
-    private fun clearBarcodes() {
-        val service = BarcodeScannerService.getInstance()
-        service?.clearBarcodes()
-    }
-    
-    // 重写按键处理方法，将按键事件传递给服务
-    override fun dispatchKeyEvent(event: KeyEvent): Boolean {
-        // 只处理按键按下事件
-        if (event.action == KeyEvent.ACTION_DOWN) {
-            val keyCode = event.keyCode
-            val eventTime = event.eventTime
-            
-            // 检查是否是短时间内的重复事件
-            if (keyCode == lastKeyDownCode && (eventTime - lastKeyDownTime) < 50) {
-                // 如果是短时间内的重复按键，继续正常流程，但不发送给服务
-                Log.d(TAG, "忽略重复按键: $keyCode")
-                return super.dispatchKeyEvent(event)
-            }
-            
-            // 更新记录的按键信息
-            lastKeyDownCode = keyCode
-            lastKeyDownTime = eventTime
-            
-            // 获取服务实例
-            val service = BarcodeScannerService.getInstance()
-            
-            // 如果服务存在，则将按键事件传递给服务处理
-            if (service != null) {
-                Log.d(TAG, "处理按键: $keyCode")
-                service.handleKeyEvent(event)
-            }
-        }
-        
-        // 继续正常的按键处理流程
-        return super.dispatchKeyEvent(event)
-    }
-    
-    // 请求悬浮窗权限
-    private fun requestOverlayPermission() {
+    // 启动条码扫描服务
+    private fun startBarcodeService() {
         try {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                if (!Settings.canDrawOverlays(this)) {
-                    val intent = Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION)
-                    intent.data = Uri.parse("package:$packageName")
-                    startActivityForResult(intent, OVERLAY_PERMISSION_REQ_CODE)
-                } else {
-                    // 已有权限，直接启动悬浮窗
-                    startFloatingWindowService()
-                }
+            val serviceIntent = Intent(this, BarcodeScannerService::class.java)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                startForegroundService(serviceIntent)
+            } else {
+                startService(serviceIntent)
             }
+            Log.d(TAG, "条码扫描服务已启动")
         } catch (e: Exception) {
-            Log.e(TAG, "请求悬浮窗权限失败: ${e.message}")
+            Log.e(TAG, "启动条码扫描服务失败: ${e.message}")
+        }
+    }
+    
+    // 停止条码扫描服务
+    private fun stopBarcodeService() {
+        try {
+            val serviceIntent = Intent(this, BarcodeScannerService::class.java)
+            stopService(serviceIntent)
+            Log.d(TAG, "条码扫描服务已停止")
+        } catch (e: Exception) {
+            Log.e(TAG, "停止条码扫描服务失败: ${e.message}")
         }
     }
     
     // 启动悬浮窗服务
-    private fun startFloatingWindowService() {
+    private fun startFloatingWindow() {
         try {
-            val intent = Intent(this, FloatingWindowService::class.java)
-            
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                startForegroundService(intent)
-            } else {
-                startService(intent)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !Settings.canDrawOverlays(this)) {
+                Log.w(TAG, "没有悬浮窗权限，无法启动悬浮窗")
+                Toast.makeText(this, "请先授予悬浮窗权限", Toast.LENGTH_LONG).show()
+                requestOverlayPermission()
+                return
             }
             
+            val serviceIntent = Intent(this, FloatingWindowService::class.java)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                startForegroundService(serviceIntent)
+            } else {
+                startService(serviceIntent)
+            }
             Log.d(TAG, "悬浮窗服务已启动")
         } catch (e: Exception) {
             Log.e(TAG, "启动悬浮窗服务失败: ${e.message}")
@@ -351,106 +169,215 @@ class MainActivity : FlutterActivity() {
     }
     
     // 停止悬浮窗服务
-    private fun stopFloatingWindowService() {
+    private fun stopFloatingWindow() {
         try {
-            val intent = Intent(this, FloatingWindowService::class.java)
-            stopService(intent)
+            val serviceIntent = Intent(this, FloatingWindowService::class.java)
+            stopService(serviceIntent)
             Log.d(TAG, "悬浮窗服务已停止")
         } catch (e: Exception) {
             Log.e(TAG, "停止悬浮窗服务失败: ${e.message}")
         }
     }
     
-    // 处理权限请求结果
-    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
-        if (requestCode == OVERLAY_PERMISSION_REQ_CODE) {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                if (Settings.canDrawOverlays(this)) {
-                    // 权限获取成功，启动悬浮窗
-                    startFloatingWindowService()
-                } else {
-                    // 用户拒绝了权限
-                    Toast.makeText(this, "需要悬浮窗权限才能保持后台扫码功能运行", Toast.LENGTH_LONG).show()
-                }
-            }
+    // 请求悬浮窗权限
+    private fun requestOverlayPermission() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            val intent = Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:$packageName"))
+            startActivityForResult(intent, OVERLAY_PERMISSION_REQ_CODE)
         }
-        super.onActivityResult(requestCode, resultCode, data)
     }
     
-    // 请求忽略电池优化，使服务在后台持续运行
-    private fun requestIgnoreBatteryOptimization() {
+    // 请求蓝牙权限
+    private fun requestBluetoothPermissions() {
         try {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                val packageName = packageName
-                val powerManager = getSystemService(Context.POWER_SERVICE) as android.os.PowerManager
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) {
+                Log.d(TAG, "当前Android版本无需运行时权限请求")
+                return
+            }
+            
+            val permissions = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                // Android 12及以上使用新蓝牙权限
+                arrayOf(
+                    android.Manifest.permission.BLUETOOTH_SCAN,
+                    android.Manifest.permission.BLUETOOTH_CONNECT
+                )
+            } else {
+                // Android 12以下使用传统蓝牙权限
+                arrayOf(
+                    android.Manifest.permission.BLUETOOTH,
+                    android.Manifest.permission.BLUETOOTH_ADMIN
+                )
+            }
+            
+            val missingPermissions = permissions.filter { permission ->
+                ContextCompat.checkSelfPermission(this, permission) != PackageManager.PERMISSION_GRANTED
+            }
+            
+            if (missingPermissions.isNotEmpty()) {
+                Log.d(TAG, "请求蓝牙权限: ${missingPermissions.joinToString()}")
+                ActivityCompat.requestPermissions(this, missingPermissions.toTypedArray(), BLUETOOTH_PERMISSION_REQ_CODE)
+            } else {
+                Log.d(TAG, "蓝牙权限已授予")
                 
-                if (!powerManager.isIgnoringBatteryOptimizations(packageName)) {
-                    val intent = Intent()
-                    intent.action = android.provider.Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS
-                    intent.data = android.net.Uri.parse("package:$packageName")
-                    startActivity(intent)
+                // 检查是否需要位置权限进行蓝牙扫描（Android 6.0-11需要）
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && Build.VERSION.SDK_INT < Build.VERSION_CODES.S) {
+                    val hasLocationPermission = ContextCompat.checkSelfPermission(this, android.Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED ||
+                            ContextCompat.checkSelfPermission(this, android.Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
+                    
+                    if (!hasLocationPermission) {
+                        Log.d(TAG, "蓝牙扫描需要位置权限，开始请求")
+                        requestLocationPermissions()
+                    }
                 }
             }
         } catch (e: Exception) {
-            Log.e(TAG, "请求忽略电池优化失败: ${e.message}")
+            Log.e(TAG, "请求蓝牙权限失败: ${e.message}")
         }
     }
     
-    // 检查无障碍服务是否已启用
-    private fun isAccessibilityServiceEnabled(): Boolean {
-        val accessibilityServiceName = "${packageName}/.KeyboardAccessibilityService"
-        
+    // 请求位置权限
+    private fun requestLocationPermissions() {
         try {
-            // 先检查KeyboardAccessibilityService实例是否存在（运行中）
-            if (KeyboardAccessibilityService.isRunning()) {
-                // 检查服务是否处于启用状态
-                if (KeyboardAccessibilityService.isServiceEnabled()) {
-                    Log.d(TAG, "无障碍服务实例正在运行并且处于启用状态")
-                    return true
-                } else {
-                    Log.d(TAG, "无障碍服务实例存在但已被禁用")
-                }
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) {
+                Log.d(TAG, "当前Android版本无需运行时位置权限请求")
+                return
             }
             
-            // 如果实例不存在或已被禁用，再检查系统设置
-            val accessibilityEnabled = Settings.Secure.getInt(
-                contentResolver,
-                Settings.Secure.ACCESSIBILITY_ENABLED
+            val permissions = arrayOf(
+                android.Manifest.permission.ACCESS_FINE_LOCATION,
+                android.Manifest.permission.ACCESS_COARSE_LOCATION
             )
             
-            if (accessibilityEnabled == 1) {
-                val settingValue = Settings.Secure.getString(
-                    contentResolver,
-                    Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES
-                ) ?: return false
-                
-                val isEnabled = settingValue.split(':')
-                    .map { it.trim() }
-                    .any { it.equals(accessibilityServiceName, ignoreCase = true) }
-                
-                Log.d(TAG, "无障碍服务设置状态: $isEnabled, 设置值: $settingValue")
-                return isEnabled
+            val missingPermissions = permissions.filter { permission ->
+                ContextCompat.checkSelfPermission(this, permission) != PackageManager.PERMISSION_GRANTED
+            }
+            
+            if (missingPermissions.isNotEmpty()) {
+                Log.d(TAG, "请求位置权限: ${missingPermissions.joinToString()}")
+                ActivityCompat.requestPermissions(this, missingPermissions.toTypedArray(), LOCATION_PERMISSION_REQ_CODE)
+            } else {
+                Log.d(TAG, "位置权限已授予")
             }
         } catch (e: Exception) {
-            Log.e(TAG, "检查无障碍服务状态失败: ${e.message}")
+            Log.e(TAG, "请求位置权限失败: ${e.message}")
         }
-        
-        return false
     }
     
-    // 请求无障碍服务权限
-    private fun requestAccessibilityPermission() {
+    // 请求所有必需权限
+    private fun requestAllRequiredPermissions() {
         try {
-            Toast.makeText(
-                this,
-                "请开启【蓝牙扫码枪服务】无障碍服务，以便在后台捕获蓝牙扫码枪输入",
-                Toast.LENGTH_LONG
-            ).show()
-            
-            val intent = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)
-            startActivity(intent)
+            Log.d(TAG, "开始请求所有必需权限")
+            requestBluetoothPermissions()
         } catch (e: Exception) {
-            Log.e(TAG, "请求无障碍服务权限失败: ${e.message}")
+            Log.e(TAG, "请求所有权限失败: ${e.message}")
+        }
+    }
+    
+    // 检查蓝牙权限
+    private fun hasBluetoothPermissions(): Boolean {
+        return try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                // Android 12及以上使用新的蓝牙权限
+                ContextCompat.checkSelfPermission(this, android.Manifest.permission.BLUETOOTH_SCAN) == PackageManager.PERMISSION_GRANTED &&
+                        ContextCompat.checkSelfPermission(this, android.Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED
+            } else {
+                // Android 12以下使用传统蓝牙权限
+                ContextCompat.checkSelfPermission(this, android.Manifest.permission.BLUETOOTH) == PackageManager.PERMISSION_GRANTED &&
+                        ContextCompat.checkSelfPermission(this, android.Manifest.permission.BLUETOOTH_ADMIN) == PackageManager.PERMISSION_GRANTED
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "检查蓝牙权限失败: ${e.message}")
+            false
+        }
+    }
+    
+    // 获取设备兼容性信息
+    private fun getDeviceCompatibilityInfo(): Map<String, Any> {
+        return try {
+            val hasBluetoothPermissions = hasBluetoothPermissions()
+            val hasLocationPermission = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                ContextCompat.checkSelfPermission(this, android.Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED ||
+                        ContextCompat.checkSelfPermission(this, android.Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
+            } else {
+                true
+            }
+            val hasOverlayPermission = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                Settings.canDrawOverlays(this)
+            } else {
+                true
+            }
+            
+            mapOf<String, Any>(
+                "apiLevel" to Build.VERSION.SDK_INT,
+                "supportsRuntimePermissions" to (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M),
+                "bluetoothPermissionType" to if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) "NEW" else "LEGACY",
+                "needsLocationForBluetooth" to (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && Build.VERSION.SDK_INT < Build.VERSION_CODES.S),
+                "hasBluetoothPermissions" to hasBluetoothPermissions,
+                "hasLocationPermission" to hasLocationPermission,
+                "hasOverlayPermission" to hasOverlayPermission,
+                "isSupported" to (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN),
+                "functionalLimitations" to when {
+                    Build.VERSION.SDK_INT < Build.VERSION_CODES.LOLLIPOP -> listOf("limited_bluetooth", "no_floating_window")
+                    Build.VERSION.SDK_INT < Build.VERSION_CODES.M -> listOf("no_runtime_permissions")
+                    else -> emptyList<String>()
+                }
+            )
+        } catch (e: Exception) {
+            Log.e(TAG, "获取设备兼容性信息失败: ${e.message}")
+            mapOf<String, Any>(
+                "error" to "Failed to get compatibility info: ${e.message}"
+            )
+        }
+    }
+    
+    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        
+        when (requestCode) {
+            BLUETOOTH_PERMISSION_REQ_CODE -> {
+                val allGranted = grantResults.all { it == PackageManager.PERMISSION_GRANTED }
+                if (allGranted) {
+                    Log.d(TAG, "蓝牙权限已授予")
+                    Toast.makeText(this, "蓝牙权限已授予", Toast.LENGTH_SHORT).show()
+                    
+                    // 检查是否需要位置权限
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && Build.VERSION.SDK_INT < Build.VERSION_CODES.S) {
+                        val hasLocationPermission = ContextCompat.checkSelfPermission(this, android.Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED ||
+                                ContextCompat.checkSelfPermission(this, android.Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
+                        
+                        if (!hasLocationPermission) {
+                            requestLocationPermissions()
+                        }
+                    }
+                } else {
+                    Log.w(TAG, "蓝牙权限被拒绝")
+                    Toast.makeText(this, "蓝牙权限被拒绝，部分功能可能无法使用", Toast.LENGTH_LONG).show()
+                }
+            }
+            LOCATION_PERMISSION_REQ_CODE -> {
+                val allGranted = grantResults.all { it == PackageManager.PERMISSION_GRANTED }
+                if (allGranted) {
+                    Log.d(TAG, "位置权限已授予")
+                    Toast.makeText(this, "位置权限已授予", Toast.LENGTH_SHORT).show()
+                } else {
+                    Log.w(TAG, "位置权限被拒绝")
+                    Toast.makeText(this, "位置权限被拒绝，蓝牙扫描功能可能受限", Toast.LENGTH_LONG).show()
+                }
+            }
+        }
+    }
+    
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        
+        if (requestCode == OVERLAY_PERMISSION_REQ_CODE) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && Settings.canDrawOverlays(this)) {
+                Log.d(TAG, "悬浮窗权限已授予")
+                Toast.makeText(this, "悬浮窗权限已授予", Toast.LENGTH_SHORT).show()
+            } else {
+                Log.w(TAG, "悬浮窗权限被拒绝")
+                Toast.makeText(this, "悬浮窗权限被拒绝，悬浮窗功能无法使用", Toast.LENGTH_LONG).show()
+            }
         }
     }
 }
