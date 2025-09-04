@@ -22,8 +22,10 @@ class MainActivity : FlutterActivity() {
     
     private val BARCODE_SCANNER_CHANNEL = "com.example.scan_to_pda/barcode_scanner"
     private val BARCODE_SCANNER_EVENT_CHANNEL = "com.example.scan_to_pda/barcode_scanner_events"
+    private val CRASH_LOG_CHANNEL = "com.example.scan_to_pda/crash_log"
     
     private var eventSink: EventChannel.EventSink? = null
+    private var crashLogDatabaseHelper: CrashLogDatabaseHelper? = null
     
     // 跟踪上一次处理的按键事件
     private var lastKeyDownCode: Int = -1
@@ -31,6 +33,9 @@ class MainActivity : FlutterActivity() {
     
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
+        
+        // 初始化崩溃日志数据库助手
+        crashLogDatabaseHelper = CrashLogDatabaseHelper.getInstance(this)
         
         // 设置方法通道，用于控制服务
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, BARCODE_SCANNER_CHANNEL).setMethodCallHandler { call, result ->
@@ -89,6 +94,125 @@ class MainActivity : FlutterActivity() {
             }
         }
         
+        // 设置崩溃日志方法通道
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CRASH_LOG_CHANNEL).setMethodCallHandler { call, result ->
+            when (call.method) {
+                "getCrashLogs" -> {
+                    val crashLogs = crashLogDatabaseHelper?.getAllCrashLogs() ?: emptyList()
+                    val crashLogsJson = crashLogs.map { crashLog ->
+                        mapOf(
+                            "id" to crashLog.id,
+                            "timestamp" to crashLog.timestamp,
+                            "formattedTime" to crashLog.getFormattedTime(),
+                            "crashType" to crashLog.crashType,
+                            "errorMessage" to crashLog.errorMessage,
+                            "shortDescription" to crashLog.getShortDescription(),
+                            "stackTrace" to crashLog.stackTrace,
+                            "deviceInfo" to crashLog.deviceInfo,
+                            "appVersion" to crashLog.appVersion,
+                            "androidVersion" to crashLog.androidVersion,
+                            "deviceModel" to crashLog.deviceModel,
+                            "availableMemory" to crashLog.availableMemory,
+                            "totalMemory" to crashLog.totalMemory,
+                            "isRead" to crashLog.isRead
+                        )
+                    }
+                    result.success(crashLogsJson)
+                }
+                "getCrashLogById" -> {
+                    val id = call.argument<Long>("id")
+                    if (id != null) {
+                        val crashLog = crashLogDatabaseHelper?.getCrashLogById(id)
+                        if (crashLog != null) {
+                            val crashLogJson = mapOf(
+                                "id" to crashLog.id,
+                                "timestamp" to crashLog.timestamp,
+                                "formattedTime" to crashLog.getFormattedTime(),
+                                "crashType" to crashLog.crashType,
+                                "errorMessage" to crashLog.errorMessage,
+                                "shortDescription" to crashLog.getShortDescription(),
+                                "stackTrace" to crashLog.stackTrace,
+                                "deviceInfo" to crashLog.deviceInfo,
+                                "appVersion" to crashLog.appVersion,
+                                "androidVersion" to crashLog.androidVersion,
+                                "deviceModel" to crashLog.deviceModel,
+                                "availableMemory" to crashLog.availableMemory,
+                                "totalMemory" to crashLog.totalMemory,
+                                "isRead" to crashLog.isRead
+                            )
+                            result.success(crashLogJson)
+                        } else {
+                            result.success(null)
+                        }
+                    } else {
+                        result.error("INVALID_ARGUMENT", "Missing crash log id", null)
+                    }
+                }
+                "markCrashLogAsRead" -> {
+                    val id = call.argument<Long>("id")
+                    if (id != null) {
+                        val success = crashLogDatabaseHelper?.markCrashLogAsRead(id) ?: false
+                        result.success(success)
+                    } else {
+                        result.error("INVALID_ARGUMENT", "Missing crash log id", null)
+                    }
+                }
+                "deleteCrashLog" -> {
+                    val id = call.argument<Long>("id")
+                    if (id != null) {
+                        val success = crashLogDatabaseHelper?.deleteCrashLog(id) ?: false
+                        result.success(success)
+                    } else {
+                        result.error("INVALID_ARGUMENT", "Missing crash log id", null)
+                    }
+                }
+                "clearAllCrashLogs" -> {
+                    val success = crashLogDatabaseHelper?.clearAllCrashLogs() ?: false
+                    result.success(success)
+                }
+                "getCrashLogCount" -> {
+                    val count = crashLogDatabaseHelper?.getCrashLogCount() ?: 0
+                    result.success(count)
+                }
+                "getUnreadCrashLogCount" -> {
+                    val count = crashLogDatabaseHelper?.getUnreadCrashLogCount() ?: 0
+                    result.success(count)
+                }
+                "exportCrashLog" -> {
+                    val id = call.argument<Long>("id")
+                    val format = call.argument<String>("format") ?: "txt"
+                    if (id != null) {
+                        val crashLog = crashLogDatabaseHelper?.getCrashLogById(id)
+                        if (crashLog != null) {
+                            val exportData = when (format.lowercase()) {
+                                "json" -> crashLog.toJsonFormat()
+                                else -> crashLog.toTextFormat()
+                            }
+                            result.success(exportData)
+                        } else {
+                            result.error("NOT_FOUND", "Crash log not found", null)
+                        }
+                    } else {
+                        result.error("INVALID_ARGUMENT", "Missing crash log id", null)
+                    }
+                }
+                "testCrash" -> {
+                    // 用于测试的崩溃方法
+                    try {
+                        Thread {
+                            throw RuntimeException("这是一个测试崩溃")
+                        }.start()
+                        result.success(true)
+                    } catch (e: Exception) {
+                        result.error("TEST_CRASH_FAILED", "Failed to create test crash", null)
+                    }
+                }
+                else -> {
+                    result.notImplemented()
+                }
+            }
+        }
+        
         // 设置事件通道，用于推送扫码结果
         EventChannel(flutterEngine.dartExecutor.binaryMessenger, BARCODE_SCANNER_EVENT_CHANNEL).setStreamHandler(
             object : EventChannel.StreamHandler {
@@ -108,11 +232,23 @@ class MainActivity : FlutterActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         
+        // 初始化崩溃处理器
+        CrashHandler.getInstance().init(this)
+        
+        // 启动ANR检测（可选）
+        CrashHandler.getInstance().startAnrDetection()
+        
         // 应用启动时不自动请求权限和启动服务
     }
     
     override fun onDestroy() {
         super.onDestroy()
+        
+        // 停止ANR检测，避免内存泄漏
+        CrashHandler.getInstance().stopAnrDetection()
+        
+        // 清理事件接收器
+        eventSink = null
         
         // 应用销毁时不要停止服务，保持后台运行
         // stopBarcodeScannerService()

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'bluetooth_scanner_page.dart';
+import 'crash_log_page.dart';
 
 void main() {
   runApp(const MyApp());
@@ -28,6 +29,19 @@ class HomePage extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         title: const Text('设备监听工具'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.bug_report),
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (context) => const CrashLogPage(),
+                ),
+              );
+            },
+            tooltip: '崩溃日志',
+          ),
+        ],
       ),
       body: const BluetoothScannerPage(),
     );

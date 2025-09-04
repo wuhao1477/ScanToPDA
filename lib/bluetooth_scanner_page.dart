@@ -75,9 +75,16 @@ class _BluetoothScannerPageState extends State<BluetoothScannerPage> with Widget
 
   @override
   void dispose() {
+    // 确保事件订阅被正确取消
     _eventSubscription?.cancel();
+    _eventSubscription = null;
+    
+    // 释放滚动控制器资源
     _scrollController.dispose();
+    
+    // 移除生命周期观察者
     WidgetsBinding.instance.removeObserver(this);
+    
     super.dispose();
   }
   
