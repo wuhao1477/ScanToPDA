@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'permission_guide_page.dart';
 import 'crash_log_page.dart';
 import 'about_page.dart';
+import 'widgets/update_dialog.dart';
+import 'utils/update_manager.dart';
 
 class SettingsPage extends StatelessWidget {
   const SettingsPage({super.key});
@@ -54,6 +57,24 @@ class SettingsPage extends StatelessWidget {
             subtitle: '清理应用缓存数据',
             onTap: () => _showClearCacheDialog(context),
           ),
+          _buildSettingCard(
+            context,
+            icon: Icons.system_update,
+            title: '检查更新',
+            subtitle: '检查并下载最新版本',
+            trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+            onTap: () => _checkForUpdate(context),
+          ),
+          _buildSettingCard(
+            context,
+            icon: Icons.update,
+            title: '更新设置',
+            subtitle: '配置自动更新检查频率',
+            trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (context) => const UpdateSettingsPage()),
+            ),
+          ),
           
           const SizedBox(height: 24),
           
@@ -79,24 +100,32 @@ class SettingsPage extends StatelessWidget {
           const SizedBox(height: 32),
           
           // 版本信息
-          Center(
-            child: Column(
-              children: [
-                Text(
-                  'ScanToPDA',
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    color: Colors.grey,
-                  ),
+          FutureBuilder<PackageInfo>(
+            future: PackageInfo.fromPlatform(),
+            builder: (context, snapshot) {
+              final packageInfo = snapshot.data;
+              return Center(
+                child: Column(
+                  children: [
+                    Text(
+                      'ScanToPDA',
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        color: Colors.grey,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      packageInfo != null 
+                          ? 'v${packageInfo.version}+${packageInfo.buildNumber}'
+                          : 'v0.0.1+1',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Colors.grey,
+                      ),
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 4),
-                Text(
-                  'v1.0.0',
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: Colors.grey,
-                  ),
-                ),
-              ],
-            ),
+              );
+            },
           ),
         ],
       ),
@@ -233,5 +262,83 @@ class SettingsPage extends StatelessWidget {
         );
       },
     );
+  }
+
+  void _checkForUpdate(BuildContext context) async {
+    // 显示加载对话框
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const AlertDialog(
+        content: Row(
+          children: [
+            CircularProgressIndicator(),
+            SizedBox(width: 16),
+            Text('正在检查更新...'),
+          ],
+        ),
+      ),
+    );
+
+    try {
+      final releaseInfo = await UpdateManager.instance.manualCheckForUpdate();
+      
+      // 关闭加载对话框
+      if (context.mounted) {
+        Navigator.of(context).pop();
+      }
+
+      if (releaseInfo != null && context.mounted) {
+        // 发现新版本，显示更新对话框
+        showUpdateDialog(context, releaseInfo);
+      } else if (context.mounted) {
+        // 已是最新版本
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Row(
+              children: [
+                Icon(Icons.check_circle, color: Colors.green),
+                SizedBox(width: 8),
+                Text('已是最新版本'),
+              ],
+            ),
+            content: const Text('您当前使用的已经是最新版本，无需更新。'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('确定'),
+              ),
+            ],
+          ),
+        );
+      }
+    } catch (e) {
+      // 关闭加载对话框
+      if (context.mounted) {
+        Navigator.of(context).pop();
+        
+        // 显示错误信息
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Row(
+              children: [
+                Icon(Icons.error_outline, color: Colors.red),
+                SizedBox(width: 8),
+                Text('检查更新失败'),
+              ],
+            ),
+            content: Text('无法检查更新，请检查网络连接后重试。\n\n错误信息: $e'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('确定'),
+              ),
+            ],
+          ),
+        );
+      }
+    }
   }
 }

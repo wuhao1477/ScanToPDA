@@ -3,8 +3,10 @@ import 'simple_home_page.dart';
 import 'bluetooth_scanner_page.dart';
 import 'crash_log_page.dart';
 import 'about_page.dart';
+import 'utils/update_manager.dart';
 
 void main() {
+  WidgetsFlutterBinding.ensureInitialized();
   runApp(const MyApp());
 }
 
@@ -65,8 +67,24 @@ class MyApp extends StatelessWidget {
   }
 }
 
-class HomePage extends StatelessWidget {
+class HomePage extends StatefulWidget {
   const HomePage({Key? key}) : super(key: key);
+
+  @override
+  State<HomePage> createState() => _HomePageState();
+}
+
+class _HomePageState extends State<HomePage> {
+  @override
+  void initState() {
+    super.initState();
+    // 应用启动后延迟3秒进行静默更新检查
+    Future.delayed(const Duration(seconds: 3), () {
+      if (mounted) {
+        UpdateManager.instance.silentCheckForUpdate(context);
+      }
+    });
+  }
 
   @override
   Widget build(BuildContext context) {

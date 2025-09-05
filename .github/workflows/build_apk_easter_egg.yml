@@ -1,4 +1,4 @@
-name: Build APK with Easter Egg Configuration
+name: Build and Release ScanToPDA APK
 
 on:
   workflow_dispatch:
@@ -33,7 +33,13 @@ jobs:
   build-apk:
     runs-on: ubuntu-latest
     permissions:
-      contents: write
+      contents: read  # 构建阶段只需要读取权限
+    outputs:
+      # 定义输出，用于将动态生成的文件名传递给 release job
+      apk_filename: ${{ steps.pubspec.outputs.apk_filename }}
+      app_name: ${{ steps.pubspec.outputs.app_name }}
+      app_version: ${{ steps.pubspec.outputs.app_version }}
+      checksum: ${{ steps.checksum.outputs.checksum }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -51,11 +57,41 @@ jobs:
           flutter-version: "3.35.2"
           cache: true
 
-      - name: Show env
+      - name: Install yq for YAML parsing
+        run: |
+          sudo wget https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 -O /usr/bin/yq
+          sudo chmod +x /usr/bin/yq
+          yq --version
+
+      - name: Extract app name and version from pubspec.yaml
+        id: pubspec
+        run: |
+          # 使用yq可靠地解析YAML文件
+          APP_NAME=$(yq -r '.name' pubspec.yaml)
+          APP_VERSION=$(yq -r '.version' pubspec.yaml)
+          
+          # 设置环境变量
+          echo "APP_NAME=$APP_NAME" >> $GITHUB_ENV
+          echo "APP_VERSION=$APP_VERSION" >> $GITHUB_ENV
+          
+          # 构造APK文件名
+          APK_FILENAME="${APP_NAME}-v${APP_VERSION}.apk"
+          echo "apk_filename=$APK_FILENAME" >> $GITHUB_OUTPUT
+          echo "app_name=$APP_NAME" >> $GITHUB_OUTPUT
+          echo "app_version=$APP_VERSION" >> $GITHUB_OUTPUT
+          
+          echo "✅ 提取的信息:"
+          echo "应用名称: $APP_NAME"
+          echo "应用版本: $APP_VERSION" 
+          echo "APK文件名: $APK_FILENAME"
+
+      - name: Show environment info
         run: |
           flutter --version
           dart --version || true
           echo "GITHUB_REF: $GITHUB_REF"
+          echo "应用名称: ${{ env.APP_NAME }}"
+          echo "应用版本: ${{ env.APP_VERSION }}"
 
       - name: Make script executable
         run: chmod +x ./build_with_easter_egg.sh
@@ -77,7 +113,7 @@ jobs:
             echo "📱 构建标准 APK（无彩蛋配置）..."
             flutter clean
             flutter pub get
-            flutter build apk
+            flutter build apk --release
             echo "✅ 标准 APK 构建完成！"
             echo "APK 位置: build/app/outputs/flutter-apk/app-release.apk"
           else
@@ -85,32 +121,86 @@ jobs:
             ./build_with_easter_egg.sh "$ACTION_TYPE" "$TARGET"
           fi
 
+      - name: Rename APK with version
+        run: |
+          cd build/app/outputs/flutter-apk/
+          # 重命名APK文件为版本化名称
+          NEW_NAME="${{ steps.pubspec.outputs.apk_filename }}"
+          cp app-release.apk "$NEW_NAME"
+          echo "✅ APK已重命名为: $NEW_NAME"
+          ls -la "$NEW_NAME"
+
+      - name: Generate checksum
+        id: checksum
+        run: |
+          cd build/app/outputs/flutter-apk/
+          APK_FILE="${{ steps.pubspec.outputs.apk_filename }}"
+          # 生成SHA256校验和
+          CHECKSUM=$(sha256sum "$APK_FILE" | cut -d' ' -f1)
+          echo "checksum=$CHECKSUM" >> $GITHUB_OUTPUT
+          echo "✅ SHA256校验和: $CHECKSUM"
+          
+          # 创建校验和文件
+          echo "$CHECKSUM  $APK_FILE" > "${APK_FILE}.sha256"
+          echo "✅ 校验和文件已创建: ${APK_FILE}.sha256"
+
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: app-release-apk
-          path: build/app/outputs/flutter-apk/app-release.apk
+          name: versioned-apk
+          path: |
+            build/app/outputs/flutter-apk/${{ steps.pubspec.outputs.apk_filename }}
+            build/app/outputs/flutter-apk/${{ steps.pubspec.outputs.apk_filename }}.sha256
 
   release:
-    if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && github.event.inputs.create_release == 'false' && false == true) || (github.event_name == 'workflow_dispatch' && github.event.inputs.create_release == 'true')
+    # 仅在推送标签或手动调度并选择创建release时运行
+    if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && github.event.inputs.create_release == 'true')
     needs: build-apk
     runs-on: ubuntu-latest
     permissions:
-      contents: write
+      contents: write  # 发布需要写入权限
     steps:
-      - name: Download artifact
+      - name: Download APK artifacts
         uses: actions/download-artifact@v4
         with:
-          name: app-release-apk
+          name: versioned-apk
           path: artifacts
 
-      - name: Create GitHub Release (manual dispatch or tag)
+      - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || format('manual-{0}', github.run_number) }}
-          name: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || format('Manual Build {0}', github.run_number) }}
+          # 如果是标签触发，使用标签名；否则，为手动构建生成唯一名称
+          tag_name: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || format('v{0}-manual-{1}', needs.build-apk.outputs.app_version, github.run_number) }}
+          name: ${{ needs.build-apk.outputs.app_name }} ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || format('v{0} (Manual Build {1})', needs.build-apk.outputs.app_version, github.run_number) }}
+          body: |
+            ## 📱 ${{ needs.build-apk.outputs.app_name }} 版本 ${{ needs.build-apk.outputs.app_version }}
+            
+            ### 🚀 更新内容
+            - 功能优化和错误修复
+            - 性能提升和体验优化
+            - 蓝牙连接稳定性改进
+            
+            ### 🔐 文件校验
+            **SHA256校验和**: `${{ needs.build-apk.outputs.checksum }}`
+            
+            ### 📥 安装说明
+            1. 下载 APK 文件到设备
+            2. 在设备设置中允许"安装未知应用"
+            3. 点击 APK 文件开始安装
+            4. 享受新版本的功能！
+            
+            ### ⚠️ 注意事项
+            - 仅支持 Android 8.0 及以上版本
+            - 首次安装需要授权"安装未知应用"权限
+            - 建议在安装前验证文件校验和
+            
+            ---
+            **构建信息**: GitHub Actions 自动构建 | 构建号: ${{ github.run_number }}
+          # 如果不是由标签触发的，则标记为预发布版本
           prerelease: ${{ !startsWith(github.ref, 'refs/tags/') }}
-          files: artifacts/app-release.apk
+          files: |
+            artifacts/${{ needs.build-apk.outputs.apk_filename }}
+            artifacts/${{ needs.build-apk.outputs.apk_filename }}.sha256
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
