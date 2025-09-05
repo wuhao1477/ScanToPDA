@@ -68,12 +68,16 @@ jobs:
         run: |
           # 使用yq可靠地解析YAML文件
           APP_NAME=$(yq -r '.name' pubspec.yaml)
-          APP_VERSION=$(yq -r '.version' pubspec.yaml)
-          
+          FULL_VERSION=$(yq -r '.version' pubspec.yaml)
+
+          # 提取主版本号（去掉构建号）
+          APP_VERSION=$(echo "$FULL_VERSION" | cut -d'+' -f1)
+
           # 设置环境变量
           echo "APP_NAME=$APP_NAME" >> $GITHUB_ENV
           echo "APP_VERSION=$APP_VERSION" >> $GITHUB_ENV
-          
+          echo "FULL_VERSION=$FULL_VERSION" >> $GITHUB_ENV
+
           # 构造APK文件名
           APK_FILENAME="${APP_NAME}-v${APP_VERSION}.apk"
           echo "apk_filename=$APK_FILENAME" >> $GITHUB_OUTPUT
