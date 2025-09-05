@@ -344,11 +344,21 @@ class _SimpleHomePageState extends State<SimpleHomePage> {
 
   // 打开权限设置页面
   Future<void> _openPermissionGuide() async {
-    final result = await Navigator.of(context).push<bool>(
-      MaterialPageRoute(builder: (context) => const PermissionGuidePage()),
+    final result = await Navigator.of(context).push<String>(
+      MaterialPageRoute(builder: (context) => const PermissionGuidePage(autoExit: true)),
     );
-    
-    if (result == true) {
+
+    if (result == 'auto_start_service') {
+      // 权限已授权，自动启动服务
+      await _checkPermissions();
+      if (_allRequiredPermissionsGranted) {
+        _setupEventListener();
+        _startStatusCheck();
+        await _startService();
+        _showMessage('权限设置完成，服务已自动启动！');
+      }
+    } else if (result == 'manual_complete') {
+      // 用户手动完成权限设置
       await _checkPermissions();
       if (_allRequiredPermissionsGranted) {
         _setupEventListener();

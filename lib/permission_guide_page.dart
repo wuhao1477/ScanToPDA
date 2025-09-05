@@ -2,7 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 class PermissionGuidePage extends StatefulWidget {
-  const PermissionGuidePage({super.key});
+  const PermissionGuidePage({
+    super.key,
+    this.autoExit = false, // 默认不自动退出，允许用户主动查看
+  });
+
+  final bool autoExit;
 
   @override
   State<PermissionGuidePage> createState() => _PermissionGuidePageState();
@@ -18,10 +23,11 @@ class _PermissionGuidePageState extends State<PermissionGuidePage> with WidgetsB
     'overlay': false,
     'accessibility': false,
   };
-  
+
   // 设备兼容性信息
   Map<String, dynamic> _deviceInfo = {};
-  
+
+
   bool _isLoading = true;
   bool _allPermissionsGranted = false;
 
@@ -33,6 +39,7 @@ class _PermissionGuidePageState extends State<PermissionGuidePage> with WidgetsB
     _checkAllPermissions();
   }
 
+
   @override
   void dispose() {
     // 移除生命周期观察者
@@ -43,13 +50,14 @@ class _PermissionGuidePageState extends State<PermissionGuidePage> with WidgetsB
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     super.didChangeAppLifecycleState(state);
-    
+
     // 当应用从后台恢复到前台时，自动刷新权限状态
     if (state == AppLifecycleState.resumed) {
       print('权限向导页面：应用恢复前台，刷新权限状态');
       _checkAllPermissions();
     }
   }
+
 
   // 检查所有权限状态
   Future<void> _checkAllPermissions() async {
@@ -74,6 +82,12 @@ class _PermissionGuidePageState extends State<PermissionGuidePage> with WidgetsB
         // 只检查必需权限（蓝牙和无障碍），悬浮窗是可选的
         _allPermissionsGranted = _permissions['bluetooth']! && _permissions['accessibility']!;
         _isLoading = false;
+
+        // 如果设置了自动退出且所有必需权限都已授权，自动退出页面并启动服务
+        if (widget.autoExit && _allPermissionsGranted && mounted) {
+          print('权限向导页面：检测到所有必需权限已授权，自动退出并启动服务');
+          Navigator.of(context).pop('auto_start_service');
+        }
       });
     } catch (e) {
       print('检查权限失败: $e');
@@ -136,16 +150,6 @@ class _PermissionGuidePageState extends State<PermissionGuidePage> with WidgetsB
     );
   }
 
-  // 显示成功消息
-  void _showSuccess(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: Colors.green,
-        duration: const Duration(seconds: 2),
-      ),
-    );
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -164,7 +168,7 @@ class _PermissionGuidePageState extends State<PermissionGuidePage> with WidgetsB
       body: _isLoading ? _buildLoadingView() : _buildPermissionView(),
       floatingActionButton: _allPermissionsGranted
           ? FloatingActionButton.extended(
-              onPressed: () => Navigator.of(context).pop(true),
+              onPressed: () => Navigator.of(context).pop('manual_complete'),
               icon: const Icon(Icons.check_circle),
               label: const Text('完成设置'),
               backgroundColor: Colors.green,
