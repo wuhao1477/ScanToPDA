@@ -105,11 +105,24 @@ jobs:
         shell: bash
         run: |
           set -euxo pipefail
-          ACTION_TYPE="${{ github.event.inputs.action_type }}"
-          TARGET="${{ github.event.inputs.target }}"
 
-          # 如果操作类型为 'none'，则构建标准 APK（无彩蛋配置）
-          if [ "$ACTION_TYPE" = "none" ]; then
+          # 处理输入参数：标签触发时使用默认值
+          if [[ "${{ github.event_name }}" == "push" ]]; then
+            # 标签触发，总是使用 none 和空目标
+            ACTION_TYPE="none"
+            TARGET=""
+            echo "🏷️ 标签触发构建，使用默认配置"
+          else
+            # 手动触发，使用输入参数
+            ACTION_TYPE="${{ github.event.inputs.action_type }}"
+            TARGET="${{ github.event.inputs.target }}"
+            echo "🔧 手动触发构建，使用自定义配置"
+          fi
+
+          echo "📋 构建参数: ACTION_TYPE=$ACTION_TYPE, TARGET=$TARGET"
+
+          # 如果操作类型为 'none' 或为空，则构建标准 APK（无彩蛋配置）
+          if [ "$ACTION_TYPE" = "none" ] || [ -z "$ACTION_TYPE" ]; then
             echo "📱 构建标准 APK（无彩蛋配置）..."
             flutter clean
             flutter pub get
