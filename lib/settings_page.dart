@@ -115,9 +115,9 @@ class SettingsPage extends StatelessWidget {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      packageInfo != null 
+                      packageInfo != null
                           ? 'v${packageInfo.version}+${packageInfo.buildNumber}'
-                          : 'v0.0.1+1',
+                          : 'v1.0.1+1',
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
                         color: Colors.grey,
                       ),

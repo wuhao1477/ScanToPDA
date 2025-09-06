@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'easter_egg_settings_page.dart';
 
 class AboutPage extends StatefulWidget {
@@ -13,6 +14,27 @@ class AboutPage extends StatefulWidget {
 
 class _AboutPageState extends State<AboutPage> {
   int _developerClickCount = 0; // 开发者名称点击计数
+  String _version = '1.0.0'; // 默认版本号
+
+  @override
+  void initState() {
+    super.initState();
+    _loadVersionInfo();
+  }
+
+  Future<void> _loadVersionInfo() async {
+    try {
+      final packageInfo = await PackageInfo.fromPlatform();
+      if (mounted) {
+        setState(() {
+          _version = packageInfo.version;
+        });
+      }
+    } catch (e) {
+      debugPrint('获取版本信息失败: $e');
+      // 保持默认版本号
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -59,7 +81,7 @@ class _AboutPageState extends State<AboutPage> {
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      'v1.0.0',
+                      'v$_version',
                       style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                         color: Colors.grey[600],
                       ),
