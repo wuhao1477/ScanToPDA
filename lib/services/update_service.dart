@@ -61,7 +61,7 @@ class ReleaseInfo {
 /// 提供基于GitHub Releases的OTA更新功能
 class UpdateService {
   // 替换为实际的GitHub仓库信息
-  static const String _githubOwner = 'wuhao'; // 请替换为实际用户名
+  static const String _githubOwner = 'wuhao1477'; // 请替换为实际用户名
   static const String _githubRepo = 'ScanToPDA'; // 请替换为实际仓库名
   static const String _apiUrl = 'https://api.github.com/repos/$_githubOwner/$_githubRepo/releases/latest';
 
